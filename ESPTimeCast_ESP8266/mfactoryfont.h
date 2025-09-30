@@ -1,7 +1,7 @@
 // Data file for user example user defined fonts
 #pragma once
 
-MD_MAX72XX::fontType_t mFactory[] PROGMEM = 
+MD_MAX72XX::fontType_t mFactory[] PROGMEM =
 {
 1, 0, 	// 0 - 'Empty Cell'
 	1, 0, 	// 1 - 'Sad Smiley'

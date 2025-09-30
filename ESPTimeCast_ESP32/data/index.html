@@ -12,7 +12,7 @@
 
   * { box-sizing: border-box; }
   html{
-    background: radial-gradient(ellipse at 70% 0%, #2b425a 0%, #171e23 100%);  
+    background: radial-gradient(ellipse at 70% 0%, #2b425a 0%, #171e23 100%);
     height: 100%;
   }
   body {
@@ -20,7 +20,7 @@
     margin: 0;
     padding: 2rem 1rem;
     color: #FFFFFF;
-    background-repeat: no-repeat, repeat, repeat; 
+    background-repeat: no-repeat, repeat, repeat;
     opacity: 0;
     transition: opacity 0.6s cubic-bezier(.4,0,.2,1);
     visibility: hidden;
@@ -36,11 +36,11 @@
   body.modal-open {
     overflow: hidden;
   }
-  h1 { 
-    text-align: center; 
-    font-size: 1.5rem; 
-    margin-bottom: 1.5rem; 
-    color: #ffffff; 
+  h1 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: #ffffff;
   }
   h2{
     margin-top: 2rem;
@@ -61,26 +61,26 @@
   form {
     display: flex; flex-direction: column;
     max-width: 500px; margin: 0 auto;
-    background: linear-gradient(120deg, rgba(45,65,90,0.72) 0%, rgba(53,133,183,0.38) 100%); 
+    background: linear-gradient(120deg, rgba(45,65,90,0.72) 0%, rgba(53,133,183,0.38) 100%);
     padding: 1.5rem;
     border-radius: 24px;
     box-shadow: 0 10px 36px 0 rgba(40,170,255,0.11), 0 2px 8px 0 rgba(44, 70, 110, 0.08);
     border: 1.5px solid rgba(180, 230, 255, 0.10)
-  }  
-  label {
-    font-size: 0.9rem; 
-    display: block; 
-    margin-top: 0.75rem; 
   }
-  input[type="text"], 
-  input[type="time"],   
-  input[type="password"], 
+  label {
+    font-size: 0.9rem;
+    display: block;
+    margin-top: 0.75rem;
+  }
+  input[type="text"],
+  input[type="time"],
+  input[type="password"],
   input[type="date"],
   input[type="number"], select {
     width: 100%; padding: 0.75rem;
     border: 1.5px solid rgba(180, 230, 255, 0.08);
     border-radius: 8px;
-    background-color: rgba(225,245,255,0.07); 
+    background-color: rgba(225,245,255,0.07);
     color: #ffffff;
     font-size: 1rem; appearance: none;
   }
@@ -130,21 +130,21 @@ input:-webkit-autofill:hover {
   transition: background 9999s ease-in-out 0s;
 }
 
-input::placeholder, 
+input::placeholder,
 textarea::placeholder {
   color: hwb(0 100% 0% / 0.39);      /* Example: light blue */
   opacity: 1;          /* Make sure it's not semi-transparent */
 }
 
-  .form-row { 
-    display: flex; 
-    flex-direction: column; 
-  }
-
-  .form-row.two-col { 
+  .form-row {
+    display: flex;
     flex-direction: column;
   }
-  .form-row.two-col > div { 
+
+  .form-row.two-col {
+    flex-direction: column;
+  }
+  .form-row.two-col > div {
     flex: 1;
   }
   .primary-button {
@@ -160,13 +160,13 @@ textarea::placeholder {
     box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35);
   }
   .primary-button:active {
-    transform: scale(0.97); 
-  }  
+    transform: scale(0.97);
+  }
 
-  .note { 
-    font-size: 0.85rem; 
-    text-align: center; 
-    margin-top: 1rem; 
+  .note {
+    font-size: 0.85rem;
+    text-align: center;
+    margin-top: 1rem;
   }
   #savingModal {
     backdrop-filter: blur(5px);
@@ -184,7 +184,7 @@ textarea::placeholder {
     margin: 1.5rem;
     padding: 2rem 2.5rem;
     text-align: center;
-  }  
+  }
   .spinner {
     border: 4px solid rgba(255, 255, 255, 0.2);
     border-top: 4px solid #007aff;
@@ -211,7 +211,7 @@ textarea::placeholder {
   select option {
     color: black;
   }
-  
+
   .geo-disabled{
     opacity: 0.5;
     background: transparent;
@@ -234,8 +234,8 @@ textarea::placeholder {
       }
 
   @media (min-width: 361px) {
-    .form-row.two-col { 
-      flex-direction: row; 
+    .form-row.two-col {
+      flex-direction: row;
       gap: 1rem; }
 
       #openWeatherCountry{
@@ -324,17 +324,17 @@ textarea::placeholder {
   </div>
   <h2>Weather Settings</h2>
   <label for="openWeatherApiKey">OpenWeather API Key</label>
-  <input type="text" id="openWeatherApiKey" name="openWeatherApiKey" placeholder="ADD-YOUR-API-KEY-32-CHARACTERS"/>    
+  <input type="text" id="openWeatherApiKey" name="openWeatherApiKey" placeholder="ADD-YOUR-API-KEY-32-CHARACTERS"/>
   <div class="small">Required to fetch weather data. <a href="https://home.openweathermap.org/users/sign_up" target="_blank">Get your API key here</a>.</div>
 
   <label>Location</label>
-  <div class="form-row two-col"> 
-    <input type="text" id="openWeatherCity" name="openWeatherCity" placeholder="City / Zip / Lat."/>    
-    <input type="text" id="openWeatherCountry" name="openWeatherCountry" placeholder="Country Code / Long."/>  
+  <div class="form-row two-col">
+    <input type="text" id="openWeatherCity" name="openWeatherCity" placeholder="City / Zip / Lat."/>
+    <input type="text" id="openWeatherCountry" name="openWeatherCountry" placeholder="Country Code / Long."/>
   </div>
   <button type="button" class="primary-button" id="geo-button" onclick="getLocation()" style="margin-top: 1rem;">Get My Location</button>
 
-  <div class="small">    
+  <div class="small">
     <strong>Location format examples:</strong> City, Country Code - Osaka, JP | ZIP, Country Code - 94040, US | Latitude, Longitude - 34.6937, 135.5023
   </div>
   <div class="geo-note" style="display: none;">
@@ -559,7 +559,7 @@ textarea::placeholder {
         </label>
 
         <label style="margin-top: 1.75rem;">Brightness: <span id="brightnessValue">10</span></label>
-        <input style="width: 100%;" type="range" min="-1" max="15" name="brightness" id="brightnessSlider" value="10" 
+        <input style="width: 100%;" type="range" min="-1" max="15" name="brightness" id="brightnessSlider" value="10"
         oninput="brightnessValue.textContent = (this.value == -1 ? 'Off' : this.value); setBrightnessLive(this.value);">
         <br><br><br>
 
@@ -571,8 +571,8 @@ textarea::placeholder {
           </span>
         </label>
 
-        <div class="form-row two-col">   
-          <div>         
+        <div class="form-row two-col">
+          <div>
             <label for="dimStartTime">Dimming Start Time:</label>
             <input type="time" id="dimStartTime" value="18:00">
           </div>
@@ -623,7 +623,7 @@ textarea::placeholder {
               title="Only uppercase letters, numbers, space, and : ! ' - . allowed">
             <div class="small">Only uppercase letters, numbers, space, and : ! ' - . allowed</div>
         </div>
-        </div>   
+        </div>
     </div>
   <input type="submit" class="primary-button" value="Save Settings">
 </form>
@@ -654,8 +654,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Only clear if it's the masked placeholder
       if (passwordInput.value === "********") {
-        passwordInput.value = ""; 
-        passwordInput.placeholder = "Enter new password"; 
+        passwordInput.value = "";
+        passwordInput.placeholder = "Enter new password";
       }
     } else {
       // Hide password as dots
@@ -833,8 +833,8 @@ dramaticCountdownEl.addEventListener('change', function () {
         ensureReloadButton();
       }
     });
-  document.querySelector('html').style.height = 'unset';       
-  document.body.classList.add('loaded');     
+  document.querySelector('html').style.height = 'unset';
+  document.body.classList.add('loaded');
 };
 
 async function submitConfig(event) {
@@ -924,7 +924,7 @@ async function submitConfig(event) {
     removeRestoreButton();
     if (isAPMode) {
       updateSavingModal("✅ Settings saved successfully!<br><br>Rebooting the device now... ", false);
-      setTimeout(() => {        
+      setTimeout(() => {
         document.getElementById('configForm').style.display = 'none';
         document.querySelector('.footer').style.display = 'none';
         document.querySelector('html').style.height = '100vh';
@@ -947,7 +947,7 @@ async function submitConfig(event) {
       showSavingModal("");
       updateSavingModal("✅ Settings saved successfully!<br><br>Rebooting the device now... ", false);
       setTimeout(() => {
-        document.getElementById('configForm').style.display = 'none'; 
+        document.getElementById('configForm').style.display = 'none';
         updateSavingModal("✅ All done!<br>You can now close this tab safely.<br><br>Your device is now rebooting and connecting to your Wi-Fi. Its new IP address will appear on the display for future access.", false);
       }, 5000);
       removeReloadButton();

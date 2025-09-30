@@ -599,7 +599,7 @@ void setupWebServer() {
 
     // Always sanitize before sending to browser
     doc[F("ssid")] = getSafeSsid();
-    doc[F("password")] = getSafePassword();  
+    doc[F("password")] = getSafePassword();
     doc[F("mode")] = isAPMode ? "ap" : "sta";
 
     String response;
