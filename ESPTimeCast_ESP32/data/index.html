@@ -229,7 +229,7 @@ textarea::placeholder {
     100% { transform: rotate(360deg); }
   }
 
-      #openWeatherCountry{
+      #openMeteoLongitude{
         margin-top: 0.75rem;
       }
 
@@ -238,7 +238,7 @@ textarea::placeholder {
       flex-direction: row;
       gap: 1rem; }
 
-      #openWeatherCountry{
+      #openMeteoLongitude{
         margin-top: 0;
       }
   }
@@ -323,19 +323,15 @@ textarea::placeholder {
     </label>
   </div>
   <h2>Weather Settings</h2>
-  <label for="openWeatherApiKey">OpenWeather API Key</label>
-  <input type="text" id="openWeatherApiKey" name="openWeatherApiKey" placeholder="ADD-YOUR-API-KEY-32-CHARACTERS"/>
-  <div class="small">Required to fetch weather data. <a href="https://home.openweathermap.org/users/sign_up" target="_blank">Get your API key here</a>.</div>
-
-  <label>Location</label>
+  <label>Location (GPS Coordinates)</label>
   <div class="form-row two-col">
-    <input type="text" id="openWeatherCity" name="openWeatherCity" placeholder="City / Zip / Lat."/>
-    <input type="text" id="openWeatherCountry" name="openWeatherCountry" placeholder="Country Code / Long."/>
+    <input type="text" id="openMeteoLatitude" name="openMeteoLatitude" placeholder="Latitude (e.g. 48.8566)"/>
+    <input type="text" id="openMeteoLongitude" name="openMeteoLongitude" placeholder="Longitude (e.g. 2.3522)"/>
   </div>
   <button type="button" class="primary-button" id="geo-button" onclick="getLocation()" style="margin-top: 1rem;">Get My Location</button>
 
   <div class="small">
-    <strong>Location format examples:</strong> City, Country Code - Osaka, JP | ZIP, Country Code - 94040, US | Latitude, Longitude - 34.6937, 135.5023
+    <strong>Location format example:</strong> Latitude, Longitude - 34.6937, 135.5023
   </div>
   <div class="geo-note" style="display: none;">
     <br>
@@ -701,9 +697,8 @@ window.onload = function () {
 
       document.getElementById('ssid').value = data.ssid || '';
       document.getElementById('password').value = data.password || '';
-      document.getElementById('openWeatherApiKey').value = data.openWeatherApiKey || '';
-      document.getElementById('openWeatherCity').value = data.openWeatherCity || '';
-      document.getElementById('openWeatherCountry').value = data.openWeatherCountry || '';
+      document.getElementById('openMeteoLatitude').value = data.openMeteoLatitude || '';
+      document.getElementById('openMeteoLongitude').value = data.openMeteoLongitude || '';
       document.getElementById('weatherUnits').checked = (data.weatherUnits === "imperial");
       document.getElementById('clockDuration').value = (data.clockDuration || 10000) / 1000;
       document.getElementById('weatherDuration').value = (data.weatherDuration || 5000) / 1000;
@@ -1267,8 +1262,8 @@ function getLocation() {
     .then(response => response.json())
     .then(data => {
       // Update your latitude/longitude fields
-      document.getElementById('openWeatherCity').value = data.lat;
-      document.getElementById('openWeatherCountry').value = data.lon;
+      document.getElementById('openMeteoLatitude').value = data.lat;
+      document.getElementById('openMeteoLongitude').value = data.lon;
 
       // Determine the label to show on the button
       const button = document.getElementById('geo-button');
@@ -1290,7 +1285,7 @@ function getLocation() {
         "- You are using an AdBlocker\n" +
         "- There is a network issue\n" +
         "- The service might be temporarily down.\n\n" +
-        "You can visit https://openweathermap.org/find to manually search for your city and get latitude/longitude."
+        "You can visit https://www.openstreetmap.org to manually search for your city and get latitude/longitude."
       );
     });
 }

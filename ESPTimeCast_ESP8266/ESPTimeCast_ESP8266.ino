@@ -34,14 +34,11 @@ const int IP_SCROLL_SPEED = 115;      // Default: Adjust this for the IP Address
 // WiFi and configuration globals
 char ssid[32] = "";
 char password[64] = "";
-char openWeatherApiKey[64] = "";
-char openWeatherCity[64] = "";
-char openWeatherCountry[64] = "";
+char openMeteoLatitude[64] = "";
+char openMeteoLongitude[64] = "";
 char weatherUnits[12] = "metric";
 char timeZone[64] = "";
 char language[8] = "en";
-String mainDesc = "";
-String detailedDesc = "";
 
 // Timing and display settings
 unsigned long clockDuration = 10000;
@@ -185,9 +182,8 @@ void loadConfig() {
     DynamicJsonDocument doc(1024);
     doc[F("ssid")] = "";
     doc[F("password")] = "";
-    doc[F("openWeatherApiKey")] = "";
-    doc[F("openWeatherCity")] = "";
-    doc[F("openWeatherCountry")] = "";
+    doc[F("openMeteoLatitude")] = "";
+    doc[F("openMeteoLongitude")] = "";
     doc[F("weatherUnits")] = "metric";
     doc[F("clockDuration")] = 10000;
     doc[F("weatherDuration")] = 5000;
@@ -247,9 +243,8 @@ void loadConfig() {
 
   strlcpy(ssid, doc["ssid"] | "", sizeof(ssid));
   strlcpy(password, doc["password"] | "", sizeof(password));
-  strlcpy(openWeatherApiKey, doc["openWeatherApiKey"] | "", sizeof(openWeatherApiKey));  // Corrected typo here
-  strlcpy(openWeatherCity, doc["openWeatherCity"] | "", sizeof(openWeatherCity));
-  strlcpy(openWeatherCountry, doc["openWeatherCountry"] | "", sizeof(openWeatherCountry));
+  strlcpy(openMeteoLatitude, doc["openMeteoLatitude"] | "", sizeof(openMeteoLatitude));
+  strlcpy(openMeteoLongitude, doc["openMeteoLongitude"] | "", sizeof(openMeteoLongitude));
   strlcpy(weatherUnits, doc["weatherUnits"] | "metric", sizeof(weatherUnits));
   clockDuration = doc["clockDuration"] | 10000;
   weatherDuration = doc["weatherDuration"] | 5000;
@@ -517,12 +512,10 @@ void printConfigToSerial() {
   Serial.println(ssid);
   Serial.print(F("WiFi Password: "));
   Serial.println(password);
-  Serial.print(F("OpenWeather City: "));
-  Serial.println(openWeatherCity);
-  Serial.print(F("OpenWeather Country: "));
-  Serial.println(openWeatherCountry);
-  Serial.print(F("OpenWeather API Key: "));
-  Serial.println(openWeatherApiKey);
+  Serial.print(F("Latitude: "));
+  Serial.println(openMeteoLatitude);
+  Serial.print(F("Longitude: "));
+  Serial.println(openMeteoLongitude);
   Serial.print(F("Temperature Unit: "));
   Serial.println(weatherUnits);
   Serial.print(F("Clock duration: "));
@@ -1319,7 +1312,6 @@ String normalizeWeatherDescription(String str) {
   return result;
 }
 
-
 bool isNumber(const char *str) {
   for (int i = 0; str[i]; i++) {
     if (!isdigit(str[i]) && str[i] != '.' && str[i] != '-') return false;
@@ -1327,143 +1319,127 @@ bool isNumber(const char *str) {
   return true;
 }
 
-bool isFiveDigitZip(const char *str) {
-  if (strlen(str) != 5) return false;
-  for (int i = 0; i < 5; i++) {
-    if (!isdigit(str[i])) return false;
-  }
-  return true;
-}
-
-
-
 // -----------------------------------------------------------------------------
-// Weather Fetching and API settings
+// Weather Fetching
 // -----------------------------------------------------------------------------
-String buildWeatherURL() {
-  String base = "https://api.openweathermap.org/data/2.5/weather?";
+String getWeatherDescription(int code, const char* lang) {
+  String desc = "";
 
-  float lat = atof(openWeatherCity);
-  float lon = atof(openWeatherCountry);
-
-  bool latValid = isNumber(openWeatherCity) && isNumber(openWeatherCountry) && lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0;
-
-  if (latValid) {
-    base += "lat=" + String(lat, 8) + "&lon=" + String(lon, 8);
-  } else if (isFiveDigitZip(openWeatherCity) && String(openWeatherCountry).equalsIgnoreCase("US")) {
-    base += "zip=" + String(openWeatherCity) + "," + String(openWeatherCountry);
-  } else {
-    base += "q=" + String(openWeatherCity) + "," + String(openWeatherCountry);
+  switch(code) {
+    case 0: desc = "CLEAR"; break;
+    case 1: case 2: desc = "PARTLY CLOUDY"; break;
+    case 3: desc = "CLOUDY"; break;
+    case 45: case 48: desc = "FOG"; break;
+    case 51: case 53: case 55: desc = "DRIZZLE"; break;
+    case 61: case 63: desc = "RAIN"; break;
+    case 65: desc = "HEAVY RAIN"; break;
+    case 71: case 73: case 75: desc = "SNOW"; break;
+    case 77: desc = "SNOW GRAINS"; break;
+    case 80: case 81: case 82: desc = "SHOWERS"; break;
+    case 85: case 86: desc = "SNOW SHOWERS"; break;
+    case 95: desc = "THUNDERSTORM"; break;
+    case 96: case 99: desc = "THUNDERSTORM HAIL"; break;
+    default: desc = "UNKNOWN"; break;
   }
 
-  base += "&appid=" + String(openWeatherApiKey);
-  base += "&units=" + String(weatherUnits);
-
-  String langForAPI = String(language);
-
-  if (langForAPI == "eo" || langForAPI == "ga" || langForAPI == "sw" || langForAPI == "ja") {
-    langForAPI = "en";
+  if (strcmp(lang, "fr") == 0) {
+    switch(code) {
+      case 0: desc = "CLAIR"; break;
+      case 1: case 2: case 3: desc = "NUAGEUX"; break;
+      case 45: case 48: desc = "BROUILLARD"; break;
+      case 61: case 63: case 65: desc = "PLUIE"; break;
+      case 71: case 73: case 75: case 77: desc = "NEIGE"; break;
+      case 95: case 96: case 99: desc = "ORAGE"; break;
+    }
   }
-  base += "&lang=" + langForAPI;
 
-  return base;
+  return normalizeWeatherDescription(desc);
 }
-
-
 
 void fetchWeather() {
-  Serial.println(F("[WEATHER] Fetching weather data..."));
+  Serial.println(F("[WEATHER] Fetching weather data from Open-Meteo..."));
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println(F("[WEATHER] Skipped: WiFi not connected"));
     weatherAvailable = false;
     weatherFetched = false;
     return;
   }
-  if (!openWeatherApiKey || strlen(openWeatherApiKey) != 32) {
-    Serial.println(F("[WEATHER] Skipped: Invalid API key (must be exactly 32 characters)"));
-    weatherAvailable = false;
-    weatherFetched = false;
-    return;
-  }
-  if (!(strlen(openWeatherCity) > 0 && strlen(openWeatherCountry) > 0)) {
-    Serial.println(F("[WEATHER] Skipped: City or Country is empty."));
+
+  float lat = atof(openMeteoLatitude);
+  float lon = atof(openMeteoLongitude);
+
+  if (!isNumber(openMeteoLatitude) || !isNumber(openMeteoLongitude) ||
+      lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+    Serial.println(F("[WEATHER] Skipped: Need valid coordinates (use Get My Location button)"));
     weatherAvailable = false;
     return;
   }
 
-  Serial.println(F("[WEATHER] Connecting to OpenWeatherMap..."));
-  String url = buildWeatherURL();
+  String url = "https://api.open-meteo.com/v1/forecast?";
+  url += "latitude=" + String(lat, 6);
+  url += "&longitude=" + String(lon, 6);
+  url += "&current=temperature_2m,relative_humidity_2m,weather_code";
+
+  if (strcmp(weatherUnits, "imperial") == 0) {
+    url += "&temperature_unit=fahrenheit";
+  } else {
+    url += "&temperature_unit=celsius";
+  }
+
   Serial.println(F("[WEATHER] URL: ") + url);
 
-  WiFiClientSecure client;  // use secure client for HTTPS
-  client.stop();            // ensure previous session closed
-  client.setInsecure();     // no cert validation
-  HTTPClient http;          // Create an HTTPClient object
-  http.begin(client, url);  // Pass the WiFiClient object and the URL
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
   client.setBufferSizes(512, 512);
-  http.setTimeout(10000);  // Sets both connection and stream timeout to 10 seconds
 
-  Serial.println(F("[WEATHER] Sending GET request..."));
-  int httpCode = http.GET();  // Send the GET request
+  HTTPClient http;
+  http.begin(client, url);
+  http.setTimeout(5000);
+  http.setReuse(false);
 
-  if (httpCode == HTTP_CODE_OK) {  // Check if HTTP response code is 200 (OK)
-    Serial.println(F("[WEATHER] HTTP 200 OK. Reading payload..."));
+  int httpCode = http.GET();
 
+  if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     Serial.println(F("[WEATHER] Response received."));
-    Serial.println(F("[WEATHER] Payload: ") + payload);
 
-    DynamicJsonDocument doc(1536);  // Adjust size as needed, use ArduinoJson Assistant
+    StaticJsonDocument<1024> doc;
     DeserializationError error = deserializeJson(doc, payload);
 
     if (error) {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
+      http.end();
       return;
     }
 
-    if (doc.containsKey(F("main")) && doc[F("main")].containsKey(F("temp"))) {
-      float temp = doc[F("main")][F("temp")];
+    if (doc["current"]["temperature_2m"]) {
+      float temp = doc["current"]["temperature_2m"];
       currentTemp = String((int)round(temp)) + "º";
-      Serial.printf("[WEATHER] Temp: %s\n", currentTemp.c_str());
       weatherAvailable = true;
-    } else {
-      Serial.println(F("[WEATHER] Temperature not found in JSON payload"));
-      weatherAvailable = false;
-      return;
+      Serial.printf("[WEATHER] Temp: %s\n", currentTemp.c_str());
     }
 
-    if (doc.containsKey(F("main")) && doc[F("main")].containsKey(F("humidity"))) {
-      currentHumidity = doc[F("main")][F("humidity")];
+    if (doc["current"]["relative_humidity_2m"]) {
+      currentHumidity = doc["current"]["relative_humidity_2m"];
       Serial.printf("[WEATHER] Humidity: %d%%\n", currentHumidity);
-    } else {
-      currentHumidity = -1;
     }
 
-    if (doc.containsKey(F("weather")) && doc[F("weather")].is<JsonArray>()) {
-      JsonObject weatherObj = doc[F("weather")][0];
-      if (weatherObj.containsKey(F("main"))) {
-        mainDesc = weatherObj[F("main")].as<String>();
-      }
-      if (weatherObj.containsKey(F("description"))) {
-        detailedDesc = weatherObj[F("description")].as<String>();
-      }
-    } else {
-      Serial.println(F("[WEATHER] Weather description not found in JSON payload"));
+    if (doc["current"]["weather_code"]) {
+      int code = doc["current"]["weather_code"];
+      weatherDescription = getWeatherDescription(code, language);
+      Serial.printf("[WEATHER] Code: %d, Description: %s\n", code, weatherDescription.c_str());
     }
 
-    weatherDescription = normalizeWeatherDescription(detailedDesc);
-    Serial.printf("[WEATHER] Description used: %s\n", weatherDescription.c_str());
     weatherFetched = true;
-
   } else {
-    Serial.printf("[WEATHER] HTTP GET failed, error code: %d, reason: %s\n", httpCode, http.errorToString(httpCode).c_str());
+    Serial.printf("[WEATHER] HTTP GET failed, code: %d\n", httpCode);
     weatherAvailable = false;
-    weatherFetched = false;
   }
 
   http.end();
+  client.stop();
 }
 
 
@@ -1543,7 +1519,7 @@ void advanceDisplayMode() {
     if (showDate) {
       displayMode = 5;  // Date mode right after Clock
       Serial.println(F("[DISPLAY] Switching to display mode: DATE (from Clock)"));
-    } else if (weatherAvailable && (strlen(openWeatherApiKey) == 32) && (strlen(openWeatherCity) > 0) && (strlen(openWeatherCountry) > 0)) {
+    } else if (weatherAvailable && (strlen(openMeteoLatitude) > 0) && (strlen(openMeteoLongitude) > 0)) {
       displayMode = 1;
       Serial.println(F("[DISPLAY] Switching to display mode: WEATHER (from Clock)"));
     } else if (countdownEnabled && !countdownFinished && ntpSyncSuccessful && countdownTargetTimestamp > 0 && countdownTargetTimestamp > time(nullptr)) {
@@ -1557,7 +1533,7 @@ void advanceDisplayMode() {
       Serial.println(F("[DISPLAY] Staying in CLOCK (from Clock)"));
     }
   } else if (displayMode == 5) {  // Date mode
-    if (weatherAvailable && (strlen(openWeatherApiKey) == 32) && (strlen(openWeatherCity) > 0) && (strlen(openWeatherCountry) > 0)) {
+    if (weatherAvailable && (strlen(openMeteoLatitude) > 0) && (strlen(openMeteoLongitude) > 0)) {
       displayMode = 1;
       Serial.println(F("[DISPLAY] Switching to display mode: WEATHER (from Date)"));
     } else if (countdownEnabled && !countdownFinished && ntpSyncSuccessful && countdownTargetTimestamp > 0 && countdownTargetTimestamp > time(nullptr)) {
@@ -1630,7 +1606,7 @@ void advanceDisplayModeSafe() {
 
     if (displayMode == 0) valid = true;  // Clock always valid
     else if (displayMode == 5 && showDate) valid = true;
-    else if (displayMode == 1 && weatherAvailable && (strlen(openWeatherApiKey) == 32) && (strlen(openWeatherCity) > 0) && (strlen(openWeatherCountry) > 0)) valid = true;
+    else if (displayMode == 1 && weatherAvailable && (strlen(openMeteoLatitude) > 0) && (strlen(openMeteoLongitude) > 0)) valid = true;
     else if (displayMode == 2 && showWeatherDescription && weatherAvailable && weatherDescription.length() > 0) valid = true;
     else if (displayMode == 3 && countdownEnabled && !countdownFinished && ntpSyncSuccessful) valid = true;
     else if (displayMode == 4 && nightscoutConfigured) valid = true;
@@ -1998,7 +1974,7 @@ void loop() {
   static bool clockScrollDone = false;
 
   // === Custom Message Display (Mode 10) ===
-  if (displayMode == 10 || (showCustomMessage && customMessagePriority > 1)) {
+  if (showCustomMessage) {
     if (showCustomMessage && millis() - customMessageStartTime < customMessageDuration) {
       P.setCharSpacing(1);
 

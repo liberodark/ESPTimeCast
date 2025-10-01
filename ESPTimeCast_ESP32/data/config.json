@@ -1,9 +1,8 @@
 {
   "ssid": "",
   "password": "",
-  "openWeatherApiKey": "",
-  "openWeatherCity": "",
-  "openWeatherCountry": "",
+  "openMeteoLatitude": "",
+  "openMeteoLongitude": "",
   "clockDuration": 10000,
   "weatherDuration": 5000,
   "timeZone": "",
