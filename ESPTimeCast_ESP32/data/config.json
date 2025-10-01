@@ -30,5 +30,11 @@
     "targetTimestamp": 0,
     "label": "",
     "isDramaticCountdown": true
+  },
+  "youtube": {
+    "enabled": false,
+    "apiKey": "",
+    "channelId": "",
+    "shortFormat": true
   }
 }

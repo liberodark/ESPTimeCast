@@ -127,6 +127,14 @@ unsigned long customMessageDuration = 5000;
 bool customMessageScrolling = false;
 int customMessagePriority = 0;
 
+// YouTube Settings
+bool youtubeEnabled = false;
+char youtubeApiKey[64] = "";
+char youtubeChannelId[64] = "";
+bool youtubeShortFormat = true;
+String currentSubscriberCount = "";
+unsigned long lastYoutubeFetch = 0;
+const unsigned long youtubeFetchInterval = 1800000; // 30 minutes
 
 // --- NEW GLOBAL VARIABLES FOR IMMEDIATE COUNTDOWN FINISH ---
 bool countdownFinished = false;                       // Tracks if the countdown has permanently finished
@@ -292,7 +300,6 @@ void loadConfig() {
     countdownTargetTimestamp = countdownObj["targetTimestamp"] | 0;
     isDramaticCountdown = countdownObj["isDramaticCountdown"] | true;
 
-
     JsonVariant labelVariant = countdownObj["label"];
     if (labelVariant.isNull() || !labelVariant.is<const char *>()) {
       strcpy(countdownLabel, "");
@@ -313,6 +320,21 @@ void loadConfig() {
     Serial.println(F("[CONFIG] Countdown object not found, defaulting to disabled."));
     countdownFinished = false;
   }
+
+  if (doc.containsKey("youtube")) {
+    JsonObject youtubeObj = doc["youtube"];
+    youtubeEnabled = youtubeObj["enabled"] | false;
+    strlcpy(youtubeApiKey, youtubeObj["apiKey"] | "", sizeof(youtubeApiKey));
+    strlcpy(youtubeChannelId, youtubeObj["channelId"] | "", sizeof(youtubeChannelId));
+    youtubeShortFormat = youtubeObj["shortFormat"] | true;
+  } else {
+    youtubeEnabled = false;
+    youtubeApiKey[0] = '\0';
+    youtubeChannelId[0] = '\0';
+    youtubeShortFormat = true;
+    Serial.println(F("[CONFIG] YouTube object not found, defaulting to disabled."));
+  }
+
   Serial.println(F("[CONFIG] Configuration loaded."));
 }
 
@@ -568,6 +590,12 @@ void printConfigToSerial() {
   Serial.println(isDramaticCountdown ? "Yes" : "No");
   Serial.print(F("API Enabled: "));
   Serial.println(apiEnabled ? "Yes" : "No");
+  Serial.print(F("YouTube Enabled: "));
+  Serial.println(youtubeEnabled ? "Yes" : "No");
+  Serial.print(F("YouTube Channel ID: "));
+  Serial.println(youtubeChannelId);
+  Serial.print(F("YouTube Short Format: "));
+  Serial.println(youtubeShortFormat ? "Yes" : "No");
   Serial.println(F("========================================"));
   Serial.println();
 }
@@ -705,6 +733,25 @@ void setupWebServer() {
     countdownObj["targetTimestamp"] = newTargetTimestamp;
     countdownObj["label"] = countdownLabelStr;
     countdownObj["isDramaticCountdown"] = newIsDramaticCountdown;
+
+    bool newYoutubeEnabled = (request->hasParam("youtubeEnabled", true) &&
+                              (request->getParam("youtubeEnabled", true)->value() == "true" ||
+                               request->getParam("youtubeEnabled", true)->value() == "on" ||
+                               request->getParam("youtubeEnabled", true)->value() == "1"));
+    String youtubeApiKeyStr = request->hasParam("youtubeApiKey", true) ?
+                              request->getParam("youtubeApiKey", true)->value() : "";
+    String youtubeChannelIdStr = request->hasParam("youtubeChannelId", true) ?
+                                 request->getParam("youtubeChannelId", true)->value() : "";
+    bool newYoutubeShortFormat = (request->hasParam("youtubeShortFormat", true) &&
+                                  (request->getParam("youtubeShortFormat", true)->value() == "true" ||
+                                  request->getParam("youtubeShortFormat", true)->value() == "on" ||
+                                  request->getParam("youtubeShortFormat", true)->value() == "1"));
+
+    JsonObject youtubeObj = doc.createNestedObject("youtube");
+    youtubeObj["enabled"] = newYoutubeEnabled;
+    youtubeObj["apiKey"] = youtubeApiKeyStr;
+    youtubeObj["channelId"] = youtubeChannelIdStr;
+    youtubeObj["shortFormat"] = newYoutubeShortFormat;
 
     FSInfo fs_info;
     LittleFS.info(fs_info);
@@ -1159,6 +1206,38 @@ void setupWebServer() {
     request->send(200, "application/json", "{\"ok\":true}");
   });
 
+  server.on("/set_youtube_enabled", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool enableYoutube = false;
+    if (request->hasParam("value", true)) {
+      String v = request->getParam("value", true)->value();
+      enableYoutube = (v == "1" || v == "true" || v == "on");
+    }
+
+    if (youtubeEnabled == true && enableYoutube == false) {
+      Serial.println(F("[WEBSERVER] YouTube toggled OFF. Checking display mode..."));
+      if (displayMode == 6) {
+        Serial.println(F("[WEBSERVER] Currently in YouTube mode. Forcing mode advance."));
+        advanceDisplayMode();
+      }
+    }
+
+    youtubeEnabled = enableYoutube;
+    Serial.printf("[WEBSERVER] Set youtubeEnabled to %d\n", youtubeEnabled);
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  server.on("/set_youtube_format", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool shortFormat = false;
+    if (request->hasParam("value", true)) {
+      String v = request->getParam("value", true)->value();
+      shortFormat = (v == "1" || v == "true" || v == "on");
+    }
+    youtubeShortFormat = shortFormat;
+    currentSubscriberCount = "";  // Force refresh
+    Serial.printf("[WEBSERVER] Set youtubeShortFormat to %d\n", youtubeShortFormat);
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
   server.begin();
   Serial.println(F("[WEBSERVER] Web server started"));
 }
@@ -1442,7 +1521,94 @@ void fetchWeather() {
   client.stop();
 }
 
+// -----------------------------------------------------------------------------
+// YouTube
+// -----------------------------------------------------------------------------
 
+String formatSubscriberCount(long subscribers) {
+  if (!youtubeShortFormat) {
+    return String(subscribers);
+  }
+
+  if (subscribers >= 1000000000) {
+    float billions = subscribers / 1000000000.0;
+    return String(billions, 3) + "B";
+  }
+  else if (subscribers >= 1000000) {
+    float millions = subscribers / 1000000.0;
+    return String(millions, 3) + "M";
+  }
+  else if (subscribers >= 1000) {
+    float thousands = subscribers / 1000.0;
+
+    if (subscribers % 1000 == 0) {
+      return String((int)thousands) + "K";
+    }
+
+    char buffer[20];
+    sprintf(buffer, "%.3f", thousands);
+
+    String result = String(buffer);
+    while (result.endsWith("0") && result.indexOf(".") != -1) {
+      result.remove(result.length() - 1);
+    }
+    if (result.endsWith(".")) {
+      result.remove(result.length() - 1);
+    }
+
+    return result + "K";
+  }
+  else {
+    return String(subscribers);
+  }
+}
+
+void fetchYoutubeSubscribers() {
+  if (WiFi.status() != WL_CONNECTED || strlen(youtubeApiKey) == 0 || strlen(youtubeChannelId) == 0) {
+    Serial.println(F("[YouTube] Skipped: WiFi not connected or missing config"));
+    return;
+  }
+
+  Serial.println(F("[YouTube] Fetching subscriber count..."));
+
+  String url = "https://www.googleapis.com/youtube/v3/channels?";
+  url += "part=statistics";
+  url += "&id=" + String(youtubeChannelId);
+  url += "&key=" + String(youtubeApiKey);
+
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
+  client.setBufferSizes(512, 512);
+
+  HTTPClient https;
+  https.begin(client, url);
+  https.setTimeout(5000);
+
+  int httpCode = https.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = https.getString();
+    StaticJsonDocument<2048> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (!error && doc["items"][0]["statistics"]["subscriberCount"]) {
+      long subscribers = doc["items"][0]["statistics"]["subscriberCount"].as<long>();
+      currentSubscriberCount = formatSubscriberCount(subscribers);
+
+      Serial.printf("[YouTube] Raw count: %ld, Formatted: %s\n",
+                    subscribers, currentSubscriberCount.c_str());
+    } else {
+      Serial.println(F("[YouTube] JSON parse error or no data"));
+      currentSubscriberCount = "ERR";
+    }
+  } else {
+    Serial.printf("[YouTube] HTTP error: %d\n", httpCode);
+    currentSubscriberCount = "---";
+  }
+
+  https.end();
+  lastYoutubeFetch = millis();
+}
 
 // -----------------------------------------------------------------------------
 // Main setup() and loop()
@@ -1454,6 +1620,9 @@ DisplayMode key:
   2: Weather Description
   3: Countdown
   4: Nightscout
+  5: Date
+  6: YouTube
+  10: Custom Message (API)
 */
 
 void setup() {
@@ -1552,10 +1721,13 @@ void advanceDisplayMode() {
       Serial.println(F("[DISPLAY] Switching to display mode: DESCRIPTION (from Weather)"));
     } else if (countdownEnabled && !countdownFinished && ntpSyncSuccessful && countdownTargetTimestamp > 0 && countdownTargetTimestamp > time(nullptr)) {
       displayMode = 3;
-      Serial.println(F("[DISPLAY] Switching to display mode: COUNTDOWN (from Weather)"));
+      Serial.println(F("[DISPLAY] Switching to display mode: COUNTDOWN (from Weather, description skipped)"));
+    } else if (youtubeEnabled && strlen(youtubeApiKey) > 0 && strlen(youtubeChannelId) > 0) {
+      displayMode = 6;  // Weather -> YouTube (if description & countdown are skipped)
+      Serial.println(F("[DISPLAY] Switching to display mode: YOUTUBE (from Weather, description & countdown skipped)"));
     } else if (nightscoutConfigured) {
-      displayMode = 4;  // Weather -> Nightscout (if description & countdown are skipped)
-      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Weather, description & countdown skipped)"));
+      displayMode = 4;  // Weather -> Nightscout (if description, countdown & youtube are skipped)
+      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Weather, all skipped)"));
     } else {
       displayMode = 0;
       Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Weather)"));
@@ -1564,20 +1736,36 @@ void advanceDisplayMode() {
     if (countdownEnabled && !countdownFinished && ntpSyncSuccessful && countdownTargetTimestamp > 0 && countdownTargetTimestamp > time(nullptr)) {
       displayMode = 3;
       Serial.println(F("[DISPLAY] Switching to display mode: COUNTDOWN (from Description)"));
+    } else if (youtubeEnabled && strlen(youtubeApiKey) > 0 && strlen(youtubeChannelId) > 0) {
+      displayMode = 6;  // Description -> YouTube (if countdown is skipped)
+      Serial.println(F("[DISPLAY] Switching to display mode: YOUTUBE (from Description, countdown skipped)"));
     } else if (nightscoutConfigured) {
-      displayMode = 4;  // Description -> Nightscout (if countdown is skipped)
-      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Description, countdown skipped)"));
+      displayMode = 4;  // Description -> Nightscout (if countdown & youtube are skipped)
+      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Description, countdown & youtube skipped)"));
     } else {
       displayMode = 0;
       Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Description)"));
     }
-  } else if (displayMode == 3) {  // Countdown -> Nightscout
-    if (nightscoutConfigured) {
-      displayMode = 4;
-      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Countdown)"));
+  } else if (displayMode == 3) {  // Countdown -> YouTube, Nightscout or Clock
+    if (youtubeEnabled && strlen(youtubeApiKey) > 0 && strlen(youtubeChannelId) > 0) {
+      displayMode = 6;  // Countdown -> YouTube
+      Serial.println(F("[DISPLAY] Switching to display mode: YOUTUBE (from Countdown)"));
+    } else if (nightscoutConfigured) {
+      displayMode = 4;  // Countdown -> Nightscout (if youtube is skipped)
+      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from Countdown, YouTube skipped)"));
     } else {
       displayMode = 0;
       Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Countdown)"));
+    }
+  } else if (displayMode == 6) {  // YouTube -> Nightscout or Clock
+    String ntpField = String(ntpServer2);
+    bool nightscoutConfigured = ntpField.startsWith("https://");
+    if (nightscoutConfigured) {
+      displayMode = 4;
+      Serial.println(F("[DISPLAY] Switching to display mode: NIGHTSCOUT (from YouTube)"));
+    } else {
+      displayMode = 0;
+      Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from YouTube)"));
     }
   } else if (displayMode == 4) {  // Nightscout -> Clock
     displayMode = 0;
@@ -2531,6 +2719,69 @@ void loop() {
       advanceDisplayMode();
       return;
     }
+  }
+
+  // --- YOUTUBE Display Mode ---
+  else if (displayMode == 6 && youtubeEnabled) {
+    if (currentSubscriberCount.length() == 0 ||
+        millis() - lastYoutubeFetch > youtubeFetchInterval) {
+      fetchYoutubeSubscribers();
+    }
+
+    if (currentSubscriberCount.length() > 0 &&
+        currentSubscriberCount != "---" &&
+        currentSubscriberCount != "ERR") {
+
+      String display = "YT: " + currentSubscriberCount;
+
+      if (display.length() > 10) {
+        static bool youtubeScrolling = false;
+        static unsigned long youtubeScrollEndTime = 0;
+
+        if (!youtubeScrolling) {
+          P.setCharSpacing(1);
+          textEffect_t scrollDir = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+          P.displayScroll(display.c_str(), PA_CENTER, scrollDir, GENERAL_SCROLL_SPEED);
+          youtubeScrolling = true;
+          youtubeScrollEndTime = 0;
+        }
+
+        if (P.displayAnimate()) {
+          if (youtubeScrollEndTime == 0) {
+            youtubeScrollEndTime = millis();
+          }
+          if (millis() - youtubeScrollEndTime > 300) {
+            youtubeScrolling = false;
+            youtubeScrollEndTime = 0;
+            advanceDisplayMode();
+          }
+        }
+      } else {
+        P.setTextAlignment(PA_CENTER);
+        P.setCharSpacing(1);
+        P.print(display.c_str());
+
+        if (millis() - lastSwitch > weatherDuration) {
+          advanceDisplayMode();
+        }
+      }
+    } else {
+      P.setTextAlignment(PA_CENTER);
+      P.setCharSpacing(1);
+
+      if (currentSubscriberCount == "ERR") {
+        P.print("YT: ERR");
+      } else {
+        P.print("YT: ---");
+      }
+
+      if (millis() - lastSwitch > 2000) {
+        advanceDisplayMode();
+      }
+    }
+
+    yield();
+    return;
   }
 
   //DATE Display Mode

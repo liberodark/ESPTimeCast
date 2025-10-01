@@ -558,6 +558,39 @@ textarea::placeholder {
         </div>
 
         <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
+          <span style="margin-right: 0.5em;">Show YouTube Subscribers:</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="youtubeEnabled" name="youtubeEnabled" onchange="setYoutubeEnabled(this.checked)">
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+
+        <div id="youtubeSettings" style="margin-top: 1rem;">
+          <label>YouTube API Key:</label>
+          <input type="text" name="youtubeApiKey" id="youtubeApiKey" placeholder="AIza...">
+          <div class="small" style="margin-bottom: 1rem;">
+            Get your API key from <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>
+          <br>Enable "YouTube Data API v3" and create credentials
+        </div>
+
+        <label>YouTube Channel ID:</label>
+        <input type="text" name="youtubeChannelId" id="youtubeChannelId" placeholder="UC...">
+        <div class="small" style="margin-bottom: 1rem;">
+          Find your channel ID in <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer">YouTube Studio</a> → Settings → Channel → Advanced settings
+          <br>Starts with "UC" (e.g., UCdBK94H6oZT2Q7l0-b0xmMg)
+        </div>
+
+        <label style="display: flex; align-items: center; justify-content: space-between;">
+          <span>Use Short Format (12.3K):</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="youtubeShortFormat" name="youtubeShortFormat" onchange="setYoutubeShortFormat(this.checked)" checked>
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+        <div class="small">Shows subscriber count as 12.3K instead of 12345</div>
+        </div>
+
+        <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
           <span style="margin-right: 0.5em;">Flip Display (180°):</span>
           <span class="toggle-switch">
             <input type="checkbox" id="flipDisplay" name="flipDisplay" onchange="setFlipDisplay(this.checked)">
@@ -716,6 +749,11 @@ window.onload = function () {
       document.getElementById('colonBlinkEnabled').checked = !!data.colonBlinkEnabled;
       document.getElementById('showWeatherDescription').checked = !!data.showWeatherDescription;
       document.getElementById('apiEnabled').checked = !!data.apiEnabled;
+      // YT
+      document.getElementById('youtubeEnabled').checked = !!(data.youtube && data.youtube.enabled);
+      document.getElementById('youtubeApiKey').value = (data.youtube && data.youtube.apiKey) || '';
+      document.getElementById('youtubeChannelId').value = (data.youtube && data.youtube.channelId) || '';
+      document.getElementById('youtubeShortFormat').checked = data.youtube ? data.youtube.shortFormat : true;
       // Dimming controls
 const dimmingEnabledEl = document.getElementById('dimmingEnabled');
 const isDimming = (data.dimmingEnabled === true || data.dimmingEnabled === "true" || data.dimmingEnabled === 1);
@@ -724,10 +762,16 @@ dimmingEnabledEl.checked = isDimming;
 // Defer field enabling until checkbox state is rendered
 setTimeout(() => {
   setDimmingFieldsEnabled(dimmingEnabledEl.checked);
+  setYoutubeFieldsEnabled(document.getElementById('youtubeEnabled').checked);
 }, 0);
 
 dimmingEnabledEl.addEventListener('change', function () {
   setDimmingFieldsEnabled(this.checked);
+});
+
+document.getElementById('youtubeEnabled').addEventListener('change', function() {
+  setYoutubeEnabled(this.checked);
+  setYoutubeFieldsEnabled(this.checked);
 });
 
       document.getElementById('dimStartTime').value =
@@ -893,6 +937,11 @@ async function submitConfig(event) {
   // Also apply the same validation for the label when submitting
   const finalCountdownLabel = document.getElementById('countdownLabel').value.toUpperCase().replace(/[^A-Z0-9 :!'.\-]/g, '');
   formData.set('countdownLabel', finalCountdownLabel);
+  // --- NEW: YouTube Form Data ---
+  formData.set('youtubeEnabled', document.getElementById('youtubeEnabled').checked ? 'true' : 'false');
+  formData.set('youtubeApiKey', document.getElementById('youtubeApiKey').value);
+  formData.set('youtubeChannelId', document.getElementById('youtubeChannelId').value);
+  formData.set('youtubeShortFormat', document.getElementById('youtubeShortFormat').checked ? 'true' : 'false');
   // --- END NEW ---
 
   const params = new URLSearchParams();
@@ -1288,6 +1337,32 @@ function getLocation() {
         "You can visit https://www.openstreetmap.org to manually search for your city and get latitude/longitude."
       );
     });
+}
+
+// --- YouTube Controls Logic ---
+function setYoutubeFieldsEnabled(enabled) {
+  document.getElementById('youtubeApiKey').disabled = !enabled;
+  document.getElementById('youtubeChannelId').disabled = !enabled;
+  document.getElementById('youtubeShortFormat').disabled = !enabled;
+
+  // Show/hide the settings div
+  document.getElementById('youtubeSettings').style.display = enabled ? 'block' : 'none';
+}
+
+function setYoutubeEnabled(val) {
+  fetch('/set_youtube_enabled', {
+    method: 'POST',
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "value=" + (val ? 1 : 0)
+  });
+}
+
+function setYoutubeShortFormat(val) {
+  fetch('/set_youtube_format', {
+    method: 'POST',
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "value=" + (val ? 1 : 0)
+  });
 }
 
 </script>
