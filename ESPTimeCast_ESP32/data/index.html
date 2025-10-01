@@ -551,6 +551,17 @@ textarea::placeholder {
         </label>
 
         <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
+          <span style="margin-right: 0.5em;">Enable API (Security Risk):</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="apiEnabled" name="apiEnabled" onchange="setApiEnabled(this.checked)">
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+        <div class="small" style="margin-top: 0.5rem; color: #ff9800;">
+          ⚠️ Allows external control via HTTP. Only enable on trusted networks.
+        </div>
+
+        <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
           <span style="margin-right: 0.5em;">Flip Display (180°):</span>
           <span class="toggle-switch">
             <input type="checkbox" id="flipDisplay" name="flipDisplay" onchange="setFlipDisplay(this.checked)">
@@ -709,6 +720,7 @@ window.onload = function () {
       document.getElementById('showHumidity').checked = !!data.showHumidity;
       document.getElementById('colonBlinkEnabled').checked = !!data.colonBlinkEnabled;
       document.getElementById('showWeatherDescription').checked = !!data.showWeatherDescription;
+      document.getElementById('apiEnabled').checked = !!data.apiEnabled;
       // Dimming controls
 const dimmingEnabledEl = document.getElementById('dimmingEnabled');
 const isDimming = (data.dimmingEnabled === true || data.dimmingEnabled === "true" || data.dimmingEnabled === 1);
@@ -1200,6 +1212,14 @@ function setShowWeatherDescription(val) {
 
 function setWeatherUnits(val) {
   fetch('/set_units', {
+    method: 'POST',
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "value=" + (val ? 1 : 0)
+  });
+}
+
+function setApiEnabled(val) {
+  fetch('/set_api', {
     method: 'POST',
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: "value=" + (val ? 1 : 0)

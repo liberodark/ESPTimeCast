@@ -121,6 +121,15 @@ bool countdownScrolling = false;
 unsigned long countdownScrollEndTime = 0;
 unsigned long countdownStaticStartTime = 0;  // For last-day static display
 
+// === API Message System ===
+bool apiEnabled = false;
+String customMessage = "";
+bool showCustomMessage = false;
+unsigned long customMessageStartTime = 0;
+unsigned long customMessageDuration = 5000;
+bool customMessageScrolling = false;
+int customMessagePriority = 0;
+
 
 // --- NEW GLOBAL VARIABLES FOR IMMEDIATE COUNTDOWN FINISH ---
 bool countdownFinished = false;                       // Tracks if the countdown has permanently finished
@@ -199,6 +208,7 @@ void loadConfig() {
     doc[F("dimEndMinute")] = dimEndMinute;
     doc[F("dimBrightness")] = dimBrightness;
     doc[F("showWeatherDescription")] = showWeatherDescription;
+    doc[F("apiEnabled")] = false;
 
     // Add countdown defaults when creating a new config.json
     JsonObject countdownObj = doc.createNestedObject("countdown");
@@ -258,6 +268,7 @@ void loadConfig() {
   showHumidity = doc["showHumidity"] | false;
   colonBlinkEnabled = doc.containsKey("colonBlinkEnabled") ? doc["colonBlinkEnabled"].as<bool>() : true;
   showWeatherDescription = doc["showWeatherDescription"] | false;
+  apiEnabled = doc["apiEnabled"] | false;
 
   String de = doc["dimmingEnabled"].as<String>();
   dimmingEnabled = (de == "true" || de == "on" || de == "1");
@@ -560,6 +571,8 @@ void printConfigToSerial() {
   Serial.println(countdownLabel);
   Serial.print(F("Dramatic Countdown Display: "));
   Serial.println(isDramaticCountdown ? "Yes" : "No");
+  Serial.print(F("API Enabled: "));
+  Serial.println(apiEnabled ? "Yes" : "No");
   Serial.println(F("========================================"));
   Serial.println();
 }
@@ -644,6 +657,7 @@ void setupWebServer() {
       else if (n == "showWeatherDescription") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "dimmingEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "weatherUnits") doc[n] = v;
+      else if (n == "apiEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "password") {
 
         if (v != "********" && v.length() > 0) {
@@ -1056,6 +1070,97 @@ void setupWebServer() {
     request->send(200, "application/json", "{\"ok\":true}");
   });
 
+  // API: Send custom message
+  server.on("/api/message", HTTP_POST, [](AsyncWebServerRequest *request) {
+
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    Serial.println(F("[API] Message received"));
+    DynamicJsonDocument response(256);
+
+    if (!request->hasParam("text", true)) {
+      response["error"] = "Missing text parameter";
+      String json;
+      serializeJson(response, json);
+      request->send(400, "application/json", json);
+      return;
+    }
+
+    customMessage = request->getParam("text", true)->value();
+    customMessage.toUpperCase();
+
+    if (request->hasParam("duration", true)) {
+      int dur = request->getParam("duration", true)->value().toInt();
+      customMessageDuration = (dur > 0 ? dur : 5) * 1000;
+    } else {
+      customMessageDuration = 5000;
+    }
+
+    if (request->hasParam("scroll", true)) {
+      customMessageScrolling = (request->getParam("scroll", true)->value() == "1");
+    } else {
+      customMessageScrolling = (customMessage.length() > 8);
+    }
+
+    if (request->hasParam("priority", true)) {
+      customMessagePriority = request->getParam("priority", true)->value().toInt();
+      if (customMessagePriority > 1) displayMode = 10;  // Force message mode
+    }
+
+    showCustomMessage = true;
+    customMessageStartTime = millis();
+
+    response["status"] = "ok";
+    response["message"] = customMessage;
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // API: Get status
+  server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    DynamicJsonDocument status(512);
+    time_t now = time(nullptr);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+
+    status["time"]["hour"] = timeinfo.tm_hour;
+    status["time"]["minute"] = timeinfo.tm_min;
+    status["weather"]["temp"] = currentTemp;
+    status["weather"]["humidity"] = currentHumidity;
+    status["system"]["uptime"] = millis() / 1000;
+    status["system"]["wifi_rssi"] = WiFi.RSSI();
+
+    if (showCustomMessage) {
+      status["message"]["active"] = true;
+      status["message"]["text"] = customMessage;
+    }
+
+    String json;
+    serializeJson(status, json);
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/set_api", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool enableApi = false;
+    if (request->hasParam("value", true)) {
+      String v = request->getParam("value", true)->value();
+      enableApi = (v == "1" || v == "true" || v == "on");
+    }
+    apiEnabled = enableApi;
+    Serial.printf("[WEBSERVER] Set apiEnabled to %d\n", apiEnabled);
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
 
   server.begin();
   Serial.println(F("[WEBSERVER] Web server started"));
@@ -1425,6 +1530,12 @@ void setup() {
 
 void advanceDisplayMode() {
   int oldMode = displayMode;
+  if (showCustomMessage && customMessagePriority > 0 && displayMode != 10) {
+    displayMode = 10;
+    Serial.println(F("[DISPLAY] Switching to display mode: MESSAGE (priority)"));
+    lastSwitch = millis();
+    return;
+  }
   String ntpField = String(ntpServer2);
   bool nightscoutConfigured = ntpField.startsWith("https://");
 
@@ -1495,6 +1606,9 @@ void advanceDisplayMode() {
   } else if (displayMode == 4) {  // Nightscout -> Clock
     displayMode = 0;
     Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Nightscout)"));
+  } else if (displayMode == 10) {  // Message -> Clock
+    displayMode = 0;
+    Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Message)"));
   }
 
   // --- Common cleanup/reset logic remains the same ---
@@ -1520,6 +1634,7 @@ void advanceDisplayModeSafe() {
     else if (displayMode == 2 && showWeatherDescription && weatherAvailable && weatherDescription.length() > 0) valid = true;
     else if (displayMode == 3 && countdownEnabled && !countdownFinished && ntpSyncSuccessful) valid = true;
     else if (displayMode == 4 && nightscoutConfigured) valid = true;
+    else if (displayMode == 10 && showCustomMessage) valid = true;
 
     // If we've looped back to where we started, break to avoid infinite loop
     if (displayMode == startMode) break;
@@ -1715,7 +1830,6 @@ void loop() {
   }
 
 
-
   // --- BRIGHTNESS/OFF CHECK ---
   if (brightness == -1) {
     if (!displayOff) {
@@ -1726,7 +1840,6 @@ void loop() {
     }
     yield();
   }
-
 
 
   // --- NTP State Machine ---
@@ -1880,11 +1993,42 @@ void loop() {
     advanceDisplayMode();
   }
 
-
-
   // Persistent variables (declare near top of file or loop)
   static int prevDisplayMode = -1;
   static bool clockScrollDone = false;
+
+  // === Custom Message Display (Mode 10) ===
+  if (showCustomMessage) {
+    if (showCustomMessage && millis() - customMessageStartTime < customMessageDuration) {
+      P.setCharSpacing(1);
+
+      if (customMessageScrolling) {
+        static bool msgScrollInit = false;
+        if (!msgScrollInit) {
+          textEffect_t scrollDir = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+          P.displayScroll(customMessage.c_str(), PA_CENTER, scrollDir, GENERAL_SCROLL_SPEED);
+          msgScrollInit = true;
+        }
+        if (P.displayAnimate()) {
+          if (millis() - customMessageStartTime >= customMessageDuration) {
+            showCustomMessage = false;
+            msgScrollInit = false;
+            displayMode = 0;
+          } else {
+            msgScrollInit = false; // Recommencer le scroll
+          }
+        }
+      } else {
+        P.setTextAlignment(PA_CENTER);
+        P.print(customMessage.c_str());
+      }
+    } else {
+      showCustomMessage = false;
+      if (displayMode == 10) displayMode = 0;
+    }
+    yield();
+    return;
+  }
 
   // --- CLOCK Display Mode ---
   if (displayMode == 0) {
@@ -2001,8 +2145,6 @@ void loop() {
     yield();
     return;
   }
-
-
 
 
   // --- WEATHER DESCRIPTION Display Mode ---
