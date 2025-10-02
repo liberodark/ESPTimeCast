@@ -987,6 +987,7 @@ async function submitConfig(event) {
   formData.set('dimBrightness', document.getElementById('dimBrightness').value);
   formData.set('showWeatherDescription', document.getElementById('showWeatherDescription').checked ? 'on' : '');
   formData.set('weatherUnits', document.getElementById('weatherUnits').checked ? 'imperial' : 'metric');
+  formData.set('apiEnabled', document.getElementById('apiEnabled').checked ? 'on' : '');
 
   // --- NEW: Countdown Form Data ---
   formData.set('countdownEnabled', document.getElementById('countdownEnabled').checked ? 'true' : 'false');
