@@ -558,6 +558,48 @@ textarea::placeholder {
         </div>
 
         <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
+          <span style="margin-right: 0.5em;">Enable Webhooks:</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="webhooksEnabled" name="webhooksEnabled" onchange="setWebhooks(this.checked)">
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+
+        <div id="webhookSettings" style="display: none; margin-top: 1rem;">
+          <label>Webhook Secret Key:</label>
+          <input type="text" name="webhookKey" id="webhookKey" placeholder="Enter secret key" maxlength="31">
+          <div class="small">Required for authentication (keep it secret!)</div>
+
+          <label style="margin-top: 1rem;">Max Queue Size: <span id="queueSizeValue">5</span></label>
+          <input style="width: 100%;" type="range" min="1" max="20" name="webhookQueueSize" id="webhookQueueSize" value="5"
+                 oninput="queueSizeValue.textContent = this.value;">
+
+          <label style="display: flex; align-items: center; margin-top: 1rem; justify-content: space-between;">
+            <span>Respect Quiet Hours:</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="webhookQuietHours" name="webhookQuietHours">
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <div class="small">Only priority 2 messages during dimming hours</div>
+
+          <div style="background: rgba(0,122,255,0.1); padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
+            <h4 style="margin-top: 0; color: #fff;">📡 Your Webhook URL</h4>
+            <code id="webhookUrl" style="background: rgba(255,255,255,0.1); padding: 0.5rem; display: block; border-radius: 4px; word-break: break-all;">
+              http://[YOUR_IP]/webhook
+            </code>
+
+            <button type="button" onclick="testWebhook()" class="primary-button" style="margin-top: 1rem; width: 100%;">
+              🧪 Test Webhook
+            </button>
+
+            <div class="small" style="margin-top: 1rem;">
+              <strong>Works with:</strong> IFTTT, Tasker, Home Assistant, Make, Zapier, any HTTP client
+            </div>
+          </div>
+        </div>
+
+        <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
           <span style="margin-right: 0.5em;">Show YouTube Subscribers:</span>
           <span class="toggle-switch">
             <input type="checkbox" id="youtubeEnabled" name="youtubeEnabled" onchange="setYoutubeEnabled(this.checked)">
@@ -749,6 +791,23 @@ window.onload = function () {
       document.getElementById('colonBlinkEnabled').checked = !!data.colonBlinkEnabled;
       document.getElementById('showWeatherDescription').checked = !!data.showWeatherDescription;
       document.getElementById('apiEnabled').checked = !!data.apiEnabled;
+      // Webhooks
+      document.getElementById('webhooksEnabled').checked = !!data.webhooksEnabled;
+      document.getElementById('webhookKey').value = data.webhookKey || '';
+      document.getElementById('webhookQueueSize').value = data.webhookQueueSize || 5;
+      document.getElementById('queueSizeValue').textContent = data.webhookQueueSize || 5;
+      document.getElementById('webhookQuietHours').checked = data.webhookQuietHours !== false;
+
+      // Show/hide webhook settings
+      if (data.webhooksEnabled) {
+        document.getElementById('webhookSettings').style.display = 'block';
+      }
+
+      // Update webhook URL with actual IP
+      if (!isAPMode && window.location.hostname) {
+        document.getElementById('webhookUrl').textContent =
+          `http://${window.location.hostname}/webhook`;
+      }
       // YT
       document.getElementById('youtubeEnabled').checked = !!(data.youtube && data.youtube.enabled);
       document.getElementById('youtubeApiKey').value = (data.youtube && data.youtube.apiKey) || '';
@@ -937,6 +996,11 @@ async function submitConfig(event) {
   // Also apply the same validation for the label when submitting
   const finalCountdownLabel = document.getElementById('countdownLabel').value.toUpperCase().replace(/[^A-Z0-9 :!'.\-]/g, '');
   formData.set('countdownLabel', finalCountdownLabel);
+  // --- NEW: Webhook Form Data ---
+  formData.set('webhooksEnabled', document.getElementById('webhooksEnabled').checked ? 'true' : 'false');
+  formData.set('webhookKey', document.getElementById('webhookKey').value);
+  formData.set('webhookQueueSize', document.getElementById('webhookQueueSize').value);
+  formData.set('webhookQuietHours', document.getElementById('webhookQuietHours').checked ? 'true' : 'false');
   // --- NEW: YouTube Form Data ---
   formData.set('youtubeEnabled', document.getElementById('youtubeEnabled').checked ? 'true' : 'false');
   formData.set('youtubeApiKey', document.getElementById('youtubeApiKey').value);
@@ -1337,6 +1401,52 @@ function getLocation() {
         "You can visit https://www.openstreetmap.org to manually search for your city and get latitude/longitude."
       );
     });
+}
+
+// Webhook
+function setWebhooks(val) {
+  fetch('/set_webhooks', {
+    method: 'POST',
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "value=" + (val ? 1 : 0)
+  });
+
+  document.getElementById('webhookSettings').style.display = val ? 'block' : 'none';
+}
+
+function testWebhook() {
+  const key = document.getElementById('webhookKey').value;
+  if (!key) {
+    alert('⚠️ Please set a webhook key first!');
+    return;
+  }
+
+  // Show loading
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Testing...';
+
+  fetch('/webhook', {
+    method: 'POST',
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `key=${encodeURIComponent(key)}&message=TEST OK&duration=3&priority=2`
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'queued') {
+      alert('✅ Webhook test successful!\nLook at your display!');
+    } else {
+      alert('❌ Error: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(e => {
+    alert('❌ Connection failed: ' + e.message);
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  });
 }
 
 // --- YouTube Controls Logic ---

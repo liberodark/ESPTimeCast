@@ -12,6 +12,7 @@
 #include <sntp.h>
 #include <time.h>
 #include <WiFiClientSecure.h>
+#include <queue>
 
 #include "mfactoryfont.h"   // Custom font
 #include "tz_lookup.h"      // Timezone lookup, do not duplicate mapping here!
@@ -136,6 +137,33 @@ String currentSubscriberCount = "";
 unsigned long lastYoutubeFetch = 0;
 const unsigned long youtubeFetchInterval = 1800000; // 30 minutes
 
+// === Webhook System ===
+bool webhooksEnabled = false;
+char webhookKey[32] = "";
+int webhookQueueSize = 5;
+bool webhookQuietHours = true;
+
+struct WebhookMessage {
+  String text;
+  int priority;  // 0=low, 1=normal, 2=high
+  int duration;  // milliseconds
+  bool scroll;
+  unsigned long timestamp;
+};
+
+struct WebhookMessageCompare {
+  bool operator()(const WebhookMessage& a, const WebhookMessage& b) {
+    if (a.priority != b.priority) {
+      return a.priority < b.priority;
+    }
+    return a.timestamp > b.timestamp;
+  }
+};
+
+std::priority_queue<WebhookMessage, std::vector<WebhookMessage>, WebhookMessageCompare> messageQueue;
+WebhookMessage currentWebhookMessage;
+bool processingWebhook = false;
+
 // --- NEW GLOBAL VARIABLES FOR IMMEDIATE COUNTDOWN FINISH ---
 bool countdownFinished = false;                       // Tracks if the countdown has permanently finished
 bool countdownShowFinishedMessage = false;            // Flag to indicate "TIMES UP" message is active
@@ -214,6 +242,10 @@ void loadConfig() {
     doc[F("dimBrightness")] = dimBrightness;
     doc[F("showWeatherDescription")] = showWeatherDescription;
     doc[F("apiEnabled")] = false;
+    doc[F("webhooksEnabled")] = false;
+    doc[F("webhookKey")] = "";
+    doc[F("webhookQueueSize")] = 5;
+    doc[F("webhookQuietHours")] = true;
 
     // Add countdown defaults when creating a new config.json
     JsonObject countdownObj = doc.createNestedObject("countdown");
@@ -273,6 +305,10 @@ void loadConfig() {
   colonBlinkEnabled = doc.containsKey("colonBlinkEnabled") ? doc["colonBlinkEnabled"].as<bool>() : true;
   showWeatherDescription = doc["showWeatherDescription"] | false;
   apiEnabled = doc["apiEnabled"] | false;
+  webhooksEnabled = doc["webhooksEnabled"] | false;
+  strlcpy(webhookKey, doc["webhookKey"] | "", sizeof(webhookKey));
+  webhookQueueSize = doc["webhookQueueSize"] | 5;
+  webhookQuietHours = doc["webhookQuietHours"] | true;
 
   String de = doc["dimmingEnabled"].as<String>();
   dimmingEnabled = (de == "true" || de == "on" || de == "1");
@@ -590,6 +626,14 @@ void printConfigToSerial() {
   Serial.println(isDramaticCountdown ? "Yes" : "No");
   Serial.print(F("API Enabled: "));
   Serial.println(apiEnabled ? "Yes" : "No");
+  Serial.print(F("Webhooks Enabled: "));
+  Serial.println(webhooksEnabled ? "Yes" : "No");
+  Serial.print(F("Webhook Key: "));
+  Serial.println(webhookKey);
+  Serial.print(F("Webhook Queue Size: "));
+  Serial.println(webhookQueueSize);
+  Serial.print(F("Webhook Quiet Hours: "));
+  Serial.println(webhookQuietHours ? "Yes" : "No");
   Serial.print(F("YouTube Enabled: "));
   Serial.println(youtubeEnabled ? "Yes" : "No");
   Serial.print(F("YouTube Channel ID: "));
@@ -681,6 +725,10 @@ void setupWebServer() {
       else if (n == "dimmingEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "weatherUnits") doc[n] = v;
       else if (n == "apiEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
+      else if (n == "webhooksEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
+      else if (n == "webhookKey") doc[n] = v;
+      else if (n == "webhookQueueSize") doc[n] = v.toInt();
+      else if (n == "webhookQuietHours") doc[n] = (v == "true" || v == "on" || v == "1");
 
       else if (n == "password") {
         if (v != "********" && v.length() > 0) {
@@ -1238,6 +1286,122 @@ void setupWebServer() {
     request->send(200, "application/json", "{\"ok\":true}");
   });
 
+  // Webhook
+  server.on("/webhook", HTTP_POST, [](AsyncWebServerRequest *request) {
+    Serial.println(F("[WEBHOOK] Request received"));
+
+    // Check if webhooks are enabled
+    if (!webhooksEnabled) {
+      request->send(403, "application/json", "{\"error\":\"Webhooks disabled\"}");
+      return;
+    }
+
+    // Validate key
+    if (!request->hasParam("key", true) ||
+        strcmp(request->getParam("key", true)->value().c_str(), webhookKey) != 0) {
+      Serial.println(F("[WEBHOOK] Invalid key"));
+      request->send(403, "application/json", "{\"error\":\"Invalid key\"}");
+      return;
+    }
+
+    // Check quiet hours
+    if (webhookQuietHours && dimmingEnabled) {
+      time_t now = time(nullptr);
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      int currentMinutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+      int startMinutes = dimStartHour * 60 + dimStartMinute;
+      int endMinutes = dimEndHour * 60 + dimEndMinute;
+
+      bool inQuietHours = false;
+      if (startMinutes < endMinutes) {
+        inQuietHours = (currentMinutes >= startMinutes && currentMinutes < endMinutes);
+      } else {
+        inQuietHours = (currentMinutes >= startMinutes || currentMinutes < endMinutes);
+      }
+
+      if (inQuietHours) {
+        int priority = request->hasParam("priority", true) ?
+                      request->getParam("priority", true)->value().toInt() : 1;
+        if (priority < 2) {  // Only urgent messages during quiet hours
+          request->send(202, "application/json", "{\"status\":\"quiet_hours\"}");
+          return;
+        }
+      }
+    }
+
+    // Parse message
+    WebhookMessage msg;
+    msg.text = request->hasParam("message", true) ?
+               request->getParam("message", true)->value() : "WEBHOOK";
+    msg.text.toUpperCase();
+
+    msg.priority = request->hasParam("priority", true) ?
+                   request->getParam("priority", true)->value().toInt() : 1;
+    msg.duration = request->hasParam("duration", true) ?
+                   request->getParam("duration", true)->value().toInt() * 1000 : 5000;
+    msg.scroll = request->hasParam("scroll", true) ?
+                 request->getParam("scroll", true)->value() == "1" : (msg.text.length() > 8);
+    msg.timestamp = millis();
+
+    // Check queue size
+    if (messageQueue.size() >= (unsigned int)webhookQueueSize) {
+      // Remove oldest low-priority message or reject
+      if (msg.priority > 1) {
+        // High priority: remove oldest message
+        messageQueue.pop();
+      } else {
+        request->send(429, "application/json", "{\"error\":\"Queue full\"}");
+        return;
+      }
+    }
+
+    // Add to queue
+    messageQueue.push(msg);
+    Serial.printf("[WEBHOOK] Message queued: %s (priority=%d)\n",
+                  msg.text.c_str(), msg.priority);
+
+    // Response
+    DynamicJsonDocument response(256);
+    response["status"] = "queued";
+    response["message"] = msg.text;
+    response["queue_size"] = messageQueue.size();
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Test endpoint
+  server.on("/webhook/test", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!webhooksEnabled) {
+      request->send(403, "application/json", "{\"error\":\"Webhooks disabled\"}");
+      return;
+    }
+
+    DynamicJsonDocument response(256);
+    response["enabled"] = webhooksEnabled;
+    response["requires_key"] = strlen(webhookKey) > 0;
+    response["queue_size"] = messageQueue.size();
+    response["quiet_hours"] = webhookQuietHours && dimmingEnabled;
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Live toggle
+  server.on("/set_webhooks", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool enable = false;
+    if (request->hasParam("value", true)) {
+      String v = request->getParam("value", true)->value();
+      enable = (v == "1" || v == "true" || v == "on");
+    }
+    webhooksEnabled = enable;
+    Serial.printf("[WEBSERVER] Set webhooksEnabled to %d\n", webhooksEnabled);
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
   server.begin();
   Serial.println(F("[WEBSERVER] Web server started"));
 }
@@ -1623,6 +1787,7 @@ DisplayMode key:
   5: Date
   6: YouTube
   10: Custom Message (API)
+  11: Webhook
 */
 
 void setup() {
@@ -1773,6 +1938,9 @@ void advanceDisplayMode() {
   } else if (displayMode == 10) {  // Message -> Clock
     displayMode = 0;
     Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Message)"));
+  } else if (displayMode == 11) {  // Webhook -> Clock
+    displayMode = 0;
+    Serial.println(F("[DISPLAY] Switching to display mode: CLOCK (from Webhook)"));
   }
 
   // --- Common cleanup/reset logic remains the same ---
@@ -1897,6 +2065,35 @@ void loop() {
     return;
   }
 
+  if (!processingWebhook && !messageQueue.empty() && !showingIp) {
+    WebhookMessage msg = messageQueue.top();
+
+    bool shouldProcess = false;
+
+    switch(msg.priority) {
+      case 2:  // HIGH - Interrupts everything
+        shouldProcess = true;
+        break;
+      case 1:  // NORMAL - Interrupts except countdown/youtube
+        shouldProcess = (displayMode != 3 && displayMode != 6);
+        break;
+      case 0:  // LOW - Only when showing clock
+        shouldProcess = (displayMode == 0);
+        break;
+      default:
+        shouldProcess = (displayMode == 0);
+    }
+
+    if (shouldProcess) {
+      messageQueue.pop();
+      currentWebhookMessage = msg;
+      processingWebhook = true;
+      displayMode = 11;
+      lastSwitch = millis();
+      Serial.printf("[WEBHOOK] Processing: %s (priority=%d)\n",
+                    msg.text.c_str(), msg.priority);
+    }
+  }
 
   // Dimming
   time_t now_time = time(nullptr);
@@ -2776,6 +2973,42 @@ void loop() {
       }
 
       if (millis() - lastSwitch > 2000) {
+        advanceDisplayMode();
+      }
+    }
+
+    yield();
+    return;
+  }
+
+  // --- WEBHOOK Display Mode ---
+  else if (displayMode == 11 && processingWebhook) {
+    P.setCharSpacing(1);
+
+    if (currentWebhookMessage.scroll) {
+      static bool webhookScrollInit = false;
+      if (!webhookScrollInit) {
+        textEffect_t scrollDir = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+        P.displayScroll(currentWebhookMessage.text.c_str(), PA_CENTER,
+                       scrollDir, GENERAL_SCROLL_SPEED);
+        webhookScrollInit = true;
+      }
+
+      if (P.displayAnimate()) {
+        if (millis() - lastSwitch >= currentWebhookMessage.duration) {
+          webhookScrollInit = false;
+          processingWebhook = false;
+          advanceDisplayMode();
+        } else {
+          webhookScrollInit = false; // Re-scroll
+        }
+      }
+    } else {
+      P.setTextAlignment(PA_CENTER);
+      P.print(currentWebhookMessage.text.c_str());
+
+      if (millis() - lastSwitch >= currentWebhookMessage.duration) {
+        processingWebhook = false;
         advanceDisplayMode();
       }
     }

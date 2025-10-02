@@ -4,17 +4,17 @@
 ![GitHub forks](https://img.shields.io/github/forks/mfactory-osaka/ESPTimeCast?style=social)
 ![Last Commit](https://img.shields.io/github/last-commit/mfactory-osaka/ESPTimeCast)
 
-**ESPTimeCast** is a WiFi-connected LED matrix clock and weather station based on ESP8266/ESP32 and MAX7219.  
-It displays the current time, day of the week, and local weather (temp/humidity/weather description) fetched from OpenWeatherMap.  
-Setup and configuration are fully managed via a built-in web interface.  
+**ESPTimeCast** is a WiFi-connected LED matrix clock and weather station based on ESP8266/ESP32 and MAX7219.
+It displays the current time, day of the week, and local weather (temp/humidity/weather description) fetched from OpenWeatherMap.
+Setup and configuration are fully managed via a built-in web interface.
 
 
 <video src="https://github.com/user-attachments/assets/78b6525d-8dcd-43fc-875e-28805e0f4fab"></video>
 
 ## 📦 3D Printable Case
 
-Want to give your ESPTimeCast a home? You can 3D print a custom case for it!  
-A styilish version (V2) of the case has just been released!   
+Want to give your ESPTimeCast a home? You can 3D print a custom case for it!
+A styilish version (V2) of the case has just been released!
 The case front panel (3mm) can be laser cut!
 
 <img src="assets/image01.png" alt="3D Printable Case V1" width="320" />
@@ -51,7 +51,7 @@ The case front panel (3mm) can be laser cut!
   - Dimming Hours **Scheduling**
   - **Countdown** function (Scroll / Dramatic)
   - Optional **glucose + trend** display (Nightscout-compatible, set via ntpserver2)
-    
+
 ---
 
 ## 🪛 Wiring
@@ -62,7 +62,7 @@ The case front panel (3mm) can be laser cut!
 
  Note: although the pins are labeled differently in the V4 and the S2, the positions are the same as the V3.x
 
-**Wemos D1 Mini (ESP8266) → MAX7219**  
+**Wemos D1 Mini (ESP8266) → MAX7219**
 **Wemos S2 Mini (ESP32) → MAX7219**
 
 | Wemos D1 Mini (v3.x) | Wemos D1 Mini (v4.0) | Wemos S2 Mini | MAX7219 |
@@ -71,20 +71,20 @@ The case front panel (3mm) can be laser cut!
 |  D6   |  12  |  9  |   CLK  |
 |  D7   |  13  |  11  |   CS   |
 |  D8   |  15  |  12  |   DIN  |
-|  5V  |  5V  |  5V  |   VCC  | 
+|  5V  |  5V  |  5V  |   VCC  |
 
 <img src="assets/wiring2.png" alt="Wiring" width="800" />
 
-**Important hardware update:**  
-After observing overheating issues and unstable behavior when powering the MAX7219 matrix from the Mini D1’s 3.3V pin, we’re officially switching to powering the display via the 5V USB rail instead.  
+**Important hardware update:**
+After observing overheating issues and unstable behavior when powering the MAX7219 matrix from the Mini D1’s 3.3V pin, we’re officially switching to powering the display via the 5V USB rail instead.
 
 **What’s changing:**
 - Before: Display VCC was connected to 3.3V pin on the ESP board.
 - Now: Display VCC will be connected to the board’s 5V pin (which comes directly from USB power).
-  
+
 **Why this change is needed:**
-- The MAX7219 LED matrix is designed for 5V operation.  
-- The onboard 3.3V regulator (usually an AMS1117) on the Mini D1 is very limited in current output (~800mA max, often much less in practice).  
+- The MAX7219 LED matrix is designed for 5V operation.
+- The onboard 3.3V regulator (usually an AMS1117) on the Mini D1 is very limited in current output (~800mA max, often much less in practice).
 - High-brightness matrix modules — especially green/yellow displays — can draw enough current to overload the regulator, causing:
   - Overheating
   - Voltage drop
@@ -121,7 +121,7 @@ The built-in web interface provides full configuration for:
 3. Click **Save Setting** – the device saves config, reboots, and connects.
 4. The device shows its local IP address after boot so you can login again for setting changes
 
-*External links and the "Get My Location" button require internet access.  
+*External links and the "Get My Location" button require internet access.
 They won't work while the device is in AP Mode - connect to Wi-Fi first.
 
 ### UI Example:
@@ -131,7 +131,7 @@ They won't work while the device is in AP Mode - connect to Wi-Fi first.
 
 ## ⚙️ Advanced Settings
 
-Click the **cog icon** next to “Advanced Settings” in the web UI to reveal extra configuration options.  
+Click the **cog icon** next to “Advanced Settings” in the web UI to reveal extra configuration options.
 
 **Available advanced settings:**
 
@@ -147,10 +147,10 @@ Click the **cog icon** next to “Advanced Settings” in the web UI to reveal e
 - **Flip Display**: Invert the display vertically/horizontally
 - **Brightness**: Off - 0 (dim) to 15 (bright)
 - **Dimming Feature**: Start time, end time and desired brightness selection
-- **Countdown** function, set a countdown to your favorit/next event, 2 modes: Scroll/Dramatic! 
+- **Countdown** function, set a countdown to your favorit/next event, 2 modes: Scroll/Dramatic!
 
-*Non-English characters converted to their closest English alphabet.   
-*For Esperanto, Irish, and Swahili, weather description translations are not available. Japanese translations exist, but since the device cannot display all Japanese characters, English will be used in all these cases.  
+*Non-English characters converted to their closest English alphabet.
+*For Esperanto, Irish, and Swahili, weather description translations are not available. Japanese translations exist, but since the device cannot display all Japanese characters, English will be used in all these cases.
 
 Tip: Don't forget to press the save button to keep your settings
 
@@ -226,7 +226,7 @@ Once your Arduino IDE is set up for your board (as described above):
     * With the main sketch file open, click the "Upload" button (the right arrow icon) in the Arduino IDE toolbar. This will compile the entire project and upload it to your board.
 3.  **Upload `/data` folder (LittleFS):**
     * This project uses LittleFS for storing web interface files and other assets. You'll need the LittleFS Uploader plugin.
-    * [**Install the LittleFS Uploader Plugin**](https://randomnerdtutorials.com/arduino-ide-2-install-esp8266-littlefs/) 
+    * [**Install the LittleFS Uploader Plugin**](https://randomnerdtutorials.com/arduino-ide-2-install-esp8266-littlefs/)
     * **Before uploading, ensure the Serial Monitor is closed.**
     * Open the Command Palette (`Ctrl+Shift+P` on Windows, `Cmd+Shift+P` on macOS).
     * Search for and run: `Upload Little FS to Pico/ESP8266/ESP32` (the exact command name might vary).
@@ -240,7 +240,7 @@ Once your Arduino IDE is set up for your board (as described above):
 **ESPTimeCast** automatically switches between two display modes: Clock and Weather.
 If "Show Weather Description" is enabled a third mode (Description) will display with a duration of 3 seconds, if the description is too long to fit on the display the description will scroll from right to left once.
 
-What you see on the LED matrix depends on whether the device has successfully fetched the current time (via NTP) and weather (via OpenWeatherMap).  
+What you see on the LED matrix depends on whether the device has successfully fetched the current time (via NTP) and weather (via OpenWeatherMap).
 The following table summarizes what will appear on the display in each scenario:
 
 | Display Mode | 🕒 NTP Time | 🌦️ Weather Data | 📺 Display Output                              |
@@ -259,6 +259,54 @@ The following table summarizes what will appear on the display in each scenario:
 - In **Weather** mode, if weather is available, you’ll see the temperature (like `23ºC`). If weather is not available but time is, it falls back to showing the clock. If neither is available, you’ll see `! TEMP`.
 - All status/error messages (`! NTP`, `! TEMP`) are big icons shown on the display.
 
+## Webhooks
+
+ESPTimeCast supports incoming webhooks for displaying notifications from external services.
+
+### Configuration
+1. Enable webhooks in Advanced Settings
+2. Set a secret key for authentication
+3. Configure queue size (1-20 messages)
+4. Optional: Enable quiet hours respect
+
+### Webhook URL
+http://[YOUR_ESP_IP]/webhook
+
+### Parameters
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | string | Yes | Your secret key |
+| `message` | string | Yes | Text to display (auto-uppercase) |
+| `priority` | int | No | 0=low, 1=normal, 2=high (default: 1) |
+| `duration` | int | No | Display time in seconds (default: 5) |
+| `scroll` | int | No | 1=force scroll, 0=static (auto if >8 chars) |
+
+### Priority Levels
+- **Priority 0 (Low)**: Only displays when showing clock
+- **Priority 1 (Normal)**: Interrupts clock/weather/date
+- **Priority 2 (High)**: Interrupts everything immediately
+
+### Integration Examples
+
+#### IFTTT
+Use Webhooks service with:
+- Method: POST
+- Content Type: application/x-www-form-urlencoded
+- Body: `key=YOUR_KEY&message={{TextField}}&priority=1`
+
+#### Tasker
+HTTP Request action:
+- Method: POST
+- Body: `key=YOUR_KEY&message=%CNAME CALLING&priority=2`
+
+#### curl
+```bash
+curl -X POST http://192.168.1.100/webhook \
+  -d "key=SECRET123" \
+  -d "message=CROLL" \
+  -d "priority=2"
+```
+
 **Legend:**
 - 🗓️ **Day Icon**: Custom symbol for day of week (`@`, `=`, etc.)
 - ⏰ **Time**: Current time (HH:MM)
@@ -274,7 +322,7 @@ The following table summarizes what will appear on the display in each scenario:
 If you enjoy this project, please consider supporting my work:
 
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?logo=paypal)](https://www.paypal.me/officialuphoto)
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-fafbfc?logo=github&logoColor=ea4aaa)](https://github.com/sponsors/mfactory-osaka) 
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-fafbfc?logo=github&logoColor=ea4aaa)](https://github.com/sponsors/mfactory-osaka)
 
 
 

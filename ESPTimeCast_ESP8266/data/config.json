@@ -25,6 +25,10 @@
   "dimBrightness": 2,
   "showWeatherDescription": false,
   "apiEnabled": false,
+  "webhooksEnabled": false,
+  "webhookKey": "",
+  "webhookQueueSize": 5,
+  "webhookQuietHours": true,
   "countdown": {
     "enabled": false,
     "targetTimestamp": 0,
