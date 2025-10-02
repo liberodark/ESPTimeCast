@@ -567,7 +567,13 @@ textarea::placeholder {
 
         <div id="webhookSettings" style="display: none; margin-top: 1rem;">
           <label>Webhook Secret Key:</label>
-          <input type="text" name="webhookKey" id="webhookKey" placeholder="Enter secret key" maxlength="31">
+          <div style="position: relative;">
+            <input type="password" name="webhookKey" id="webhookKey" placeholder="Enter secret key" maxlength="31">
+            <label class="small">
+              <input type="checkbox" id="toggleWebhookKey" style="margin-right: 0.3rem;" />
+              Show Secret Key
+            </label>
+          </div>
           <div class="small">Required for authentication (keep it secret!)</div>
 
           <label style="margin-top: 1rem;">Max Queue Size: <span id="queueSizeValue">5</span></label>
@@ -609,7 +615,13 @@ textarea::placeholder {
 
         <div id="youtubeSettings" style="margin-top: 1rem;">
           <label>YouTube API Key:</label>
-          <input type="text" name="youtubeApiKey" id="youtubeApiKey" placeholder="AIza...">
+          <div style="position: relative;">
+            <input type="password" name="youtubeApiKey" id="youtubeApiKey" placeholder="AIza...">
+            <label class="small">
+              <input type="checkbox" id="toggleYoutubeApiKey" style="margin-right: 0.3rem;" />
+              Show API Key
+              </label>
+          </div>
           <div class="small" style="margin-bottom: 1rem;">
             Get your API key from <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>
           <br>Enable "YouTube Data API v3" and create credentials
@@ -751,7 +763,51 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+// Show/Hide Webhook Key toggle
+document.addEventListener("DOMContentLoaded", function () {
+  const webhookKeyInput = document.getElementById("webhookKey");
+  const toggleWebhookCheckbox = document.getElementById("toggleWebhookKey");
 
+  if (toggleWebhookCheckbox && webhookKeyInput) {
+    toggleWebhookCheckbox.addEventListener("change", function () {
+      if (this.checked) {
+        webhookKeyInput.type = "text";
+        if (webhookKeyInput.value === "********") {
+          webhookKeyInput.value = "";
+          webhookKeyInput.placeholder = "Enter new secret key";
+        }
+      } else {
+        webhookKeyInput.type = "password";
+        if (webhookKeyInput.placeholder === "Enter new secret key") {
+          webhookKeyInput.placeholder = "Enter secret key";
+        }
+      }
+    });
+  }
+});
+
+// Show/Hide YouTube API Key toggle
+document.addEventListener("DOMContentLoaded", function () {
+  const youtubeApiKeyInput = document.getElementById("youtubeApiKey");
+  const toggleYoutubeCheckbox = document.getElementById("toggleYoutubeApiKey");
+
+  if (toggleYoutubeCheckbox && youtubeApiKeyInput) {
+    toggleYoutubeCheckbox.addEventListener("change", function () {
+      if (this.checked) {
+        youtubeApiKeyInput.type = "text";
+        if (youtubeApiKeyInput.value === "********") {
+          youtubeApiKeyInput.value = "";
+          youtubeApiKeyInput.placeholder = "Enter new API key";
+        }
+      } else {
+        youtubeApiKeyInput.type = "password";
+        if (youtubeApiKeyInput.placeholder === "Enter new API key") {
+          youtubeApiKeyInput.placeholder = "AIza...";
+        }
+      }
+    });
+  }
+});
 
 window.onbeforeunload = function () {
   if (isSaving) {

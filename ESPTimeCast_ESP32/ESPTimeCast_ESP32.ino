@@ -192,6 +192,22 @@ const char *getSafePassword() {
   }
 }
 
+const char *getSafeYoutubeApiKey() {
+  if (strlen(youtubeApiKey) == 0) {
+    return "";
+  } else {
+    return "********";
+  }
+}
+
+const char *getSafeWebhookKey() {
+  if (strlen(webhookKey) == 0) {
+    return "";
+  } else {
+    return "********";
+  }
+}
+
 // Scroll flipped
 textEffect_t getEffectiveScrollDirection(textEffect_t desiredDirection, bool isFlipped) {
   if (isFlipped) {
@@ -679,6 +695,9 @@ void setupWebServer() {
     doc[F("password")] = getSafePassword();
     doc[F("mode")] = isAPMode ? "ap" : "sta";
 
+    if (doc["youtube"]) doc["youtube"]["apiKey"] = getSafeYoutubeApiKey();
+    doc["webhookKey"] = getSafeWebhookKey();
+
     String response;
     serializeJson(doc, response);
     request->send(200, "application/json", response);
@@ -725,7 +744,13 @@ void setupWebServer() {
       else if (n == "weatherUnits") doc[n] = v;
       else if (n == "apiEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "webhooksEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
-      else if (n == "webhookKey") doc[n] = v;
+      else if (n == "webhookKey") {
+        if (v != "********" && v.length() > 0) {
+          doc[n] = v;
+        } else if (v != "********") {
+          doc[n] = "";
+        }
+      }
       else if (n == "webhookQueueSize") doc[n] = v.toInt();
       else if (n == "webhookQuietHours") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "password") {
@@ -792,6 +817,10 @@ void setupWebServer() {
                                   (request->getParam("youtubeShortFormat", true)->value() == "true" ||
                                   request->getParam("youtubeShortFormat", true)->value() == "on" ||
                                   request->getParam("youtubeShortFormat", true)->value() == "1"));
+
+    if (youtubeApiKeyStr == "********" && doc.containsKey("youtube")) {
+      youtubeApiKeyStr = doc["youtube"]["apiKey"] | "";
+    }
 
     JsonObject youtubeObj = doc.createNestedObject("youtube");
     youtubeObj["enabled"] = newYoutubeEnabled;
