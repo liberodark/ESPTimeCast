@@ -18,6 +18,7 @@
 #include "tz_lookup.h"      // Timezone lookup, do not duplicate mapping here!
 #include "days_lookup.h"    // Languages for the Days of the Week
 #include "months_lookup.h"  // Languages for the Months of the Year
+#include "totp.h"           // TOTP
 
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
@@ -31,6 +32,16 @@ AsyncWebServer server(80);
 // --- Global Scroll Speed Settings ---
 const int GENERAL_SCROLL_SPEED = 85;  // Default: Adjust this for Weather Description and Countdown Label (e.g., 50 for faster, 200 for slower)
 const int IP_SCROLL_SPEED = 115;      // Default: Adjust this for the IP Address display (slower for readability)
+
+// Auth
+bool authEnabled = false;
+char adminPassword[32] = "";
+bool totpEnabled = false;
+uint8_t totpSecret[20];
+char totpSecretBase32[33] = "";
+String sessionToken = "";
+unsigned long sessionExpiry = 0;
+SimpleTOTP totp;
 
 // WiFi and configuration globals
 char ssid[32] = "";
@@ -192,6 +203,14 @@ const char *getSafePassword() {
   }
 }
 
+const char *getSafeAdminPassword() {
+  if (strlen(adminPassword) == 0) {
+    return "";
+  } else {
+    return "********";
+  }
+}
+
 const char *getSafeYoutubeApiKey() {
   if (strlen(youtubeApiKey) == 0) {
     return "";
@@ -205,6 +224,114 @@ const char *getSafeWebhookKey() {
     return "";
   } else {
     return "********";
+  }
+}
+
+void generateTOTPSecret() {
+  for (int i = 0; i < 20; i++) {
+    totpSecret[i] = random(0, 256);
+  }
+
+  base32_encode(totpSecret, 20, totpSecretBase32, sizeof(totpSecretBase32));
+
+  int len = strlen(totpSecretBase32);
+  while (len > 0 && totpSecretBase32[len-1] == '=') {
+    totpSecretBase32[--len] = '\0';
+  }
+
+  totp.setSecret(totpSecret, 20);
+
+  Serial.print(F("[AUTH] Generated TOTP Secret: "));
+  Serial.println(totpSecretBase32);
+
+  DynamicJsonDocument doc(2048);
+  File configFile = LittleFS.open("/config.json", "r");
+  if (configFile) {
+    deserializeJson(doc, configFile);
+    configFile.close();
+  }
+
+  doc["totpSecret"] = totpSecretBase32;
+
+  File f = LittleFS.open("/config.json", "w");
+  if (f) {
+    serializeJson(doc, f);
+    f.close();
+  }
+}
+
+bool checkAuth(AsyncWebServerRequest *request) {
+  if (isAPMode) return true;
+  if (!authEnabled) return true;
+
+  if (request->hasHeader("X-Auth-Token")) {
+    String token = request->getHeader("X-Auth-Token")->value();
+
+    if (token == sessionToken && millis() < sessionExpiry) {
+      sessionExpiry = millis() + (30 * 60 * 1000);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void base32_encode(const uint8_t *data, int length, char *result, int resultSize) {
+  const char *base32_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  int count = 0;
+  int buffer = 0;
+  int bitsLeft = 0;
+
+  for (int i = 0; i < length; i++) {
+    buffer <<= 8;
+    buffer |= data[i];
+    bitsLeft += 8;
+
+    while (bitsLeft >= 5) {
+      if (count >= resultSize - 1) break;
+      int index = (buffer >> (bitsLeft - 5)) & 0x1F;
+      result[count++] = base32_alphabet[index];
+      bitsLeft -= 5;
+    }
+  }
+
+  if (bitsLeft > 0 && count < resultSize - 1) {
+    int index = (buffer << (5 - bitsLeft)) & 0x1F;
+    result[count++] = base32_alphabet[index];
+  }
+
+  result[count] = '\0';
+}
+
+void base32_decode(const char *encoded, uint8_t *result, int resultSize) {
+  int buffer = 0;
+  int bitsLeft = 0;
+  int count = 0;
+
+  for (int i = 0; encoded[i] && count < resultSize; i++) {
+    char ch = encoded[i];
+
+    if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '=') continue;
+
+    int val = -1;
+    if (ch >= 'A' && ch <= 'Z') {
+      val = ch - 'A';
+    } else if (ch >= 'a' && ch <= 'z') {
+      val = ch - 'a';
+    } else if (ch >= '2' && ch <= '7') {
+      val = ch - '2' + 26;
+    }
+
+    if (val == -1) continue;
+
+    buffer <<= 5;
+    buffer |= val;
+    bitsLeft += 5;
+
+    if (bitsLeft >= 8) {
+      result[count++] = (buffer >> (bitsLeft - 8)) & 0xFF;
+      bitsLeft -= 8;
+    }
   }
 }
 
@@ -233,6 +360,10 @@ void loadConfig() {
     DynamicJsonDocument doc(1024);
     doc[F("ssid")] = "";
     doc[F("password")] = "";
+    doc[F("authEnabled")] = false;
+    doc[F("adminPassword")] = "";
+    doc[F("totpEnabled")] = false;
+    doc[F("totpSecret")] = "";
     doc[F("openMeteoLatitude")] = "";
     doc[F("openMeteoLongitude")] = "";
     doc[F("weatherUnits")] = "metric";
@@ -298,6 +429,27 @@ void loadConfig() {
 
   strlcpy(ssid, doc["ssid"] | "", sizeof(ssid));
   strlcpy(password, doc["password"] | "", sizeof(password));
+
+  // Auth loading
+  authEnabled = doc["authEnabled"] | false;
+  strlcpy(adminPassword, doc["adminPassword"] | "", sizeof(adminPassword));
+  totpEnabled = doc["totpEnabled"] | false;
+  strlcpy(totpSecretBase32, doc["totpSecret"] | "", sizeof(totpSecretBase32));
+
+  if (totpEnabled && strlen(totpSecretBase32) > 0) {
+    time_t now = time(nullptr);
+
+    int len = strlen(totpSecretBase32);
+    while (len > 0 && totpSecretBase32[len-1] == '=') {
+      totpSecretBase32[--len] = '\0';
+    }
+
+    base32_decode(totpSecretBase32, totpSecret, sizeof(totpSecret));
+    totp.setSecret(totpSecret, 20);
+
+    Serial.println(F("[AUTH] TOTP secret loaded from config"));
+  }
+
   strlcpy(openMeteoLatitude, doc["openMeteoLatitude"] | "", sizeof(openMeteoLatitude));
   strlcpy(openMeteoLongitude, doc["openMeteoLongitude"] | "", sizeof(openMeteoLongitude));
   strlcpy(weatherUnits, doc["weatherUnits"] | "metric", sizeof(weatherUnits));
@@ -655,6 +807,10 @@ void printConfigToSerial() {
   Serial.println(youtubeChannelId);
   Serial.print(F("YouTube Short Format: "));
   Serial.println(youtubeShortFormat ? "Yes" : "No");
+  Serial.print(F("Auth Enabled: "));
+  Serial.println(authEnabled ? "Yes" : "No");
+  Serial.print(F("2FA Enabled: "));
+  Serial.println(totpEnabled ? "Yes" : "No");
   Serial.println(F("========================================"));
   Serial.println();
 }
@@ -670,6 +826,12 @@ void setupWebServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println(F("[WEBSERVER] Request: /"));
     request->send(LittleFS, "/index.html", "text/html");
+  });
+
+  server.on("/qrcode.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/qrcode.min.js.gz", "application/javascript");
+    response->addHeader("Content-Encoding", "gzip");
+    request->send(response);
   });
 
   server.on("/config.json", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -690,9 +852,15 @@ void setupWebServer() {
       return;
     }
 
+    if (!isAPMode && authEnabled && !checkAuth(request)) {
+      request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+      return;
+    }
+
     // Always sanitize before sending to browser
     doc[F("ssid")] = getSafeSsid();
     doc[F("password")] = getSafePassword();
+    doc["adminPassword"] = getSafeAdminPassword();
     doc[F("mode")] = isAPMode ? "ap" : "sta";
 
     if (doc["youtube"]) doc["youtube"]["apiKey"] = getSafeYoutubeApiKey();
@@ -718,6 +886,11 @@ void setupWebServer() {
       }
     } else {
       Serial.println(F("[WEBSERVER] config.json not found, starting with empty doc for save."));
+    }
+
+    if (!checkAuth(request)) {
+      request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+      return;
     }
 
     for (int i = 0; i < request->params(); i++) {
@@ -753,16 +926,25 @@ void setupWebServer() {
       }
       else if (n == "webhookQueueSize") doc[n] = v.toInt();
       else if (n == "webhookQuietHours") doc[n] = (v == "true" || v == "on" || v == "1");
-      else if (n == "password") {
+      else if (n == "authEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
+      else if (n == "adminPassword") {
+        if (v != "********" && v.length() > 0) {
+          doc[n] = v;
+        }
+      }
+      else if (n == "totpEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
+      else if (n == "totpSecret") doc[n] = totpSecretBase32;
 
+      else if (n == "password") {
         if (v != "********" && v.length() > 0) {
           doc[n] = v;  // user entered a new password
         } else {
           Serial.println(F("[SAVE] Password unchanged."));
           // do nothing, keep the one already in doc
         }
+      }
 
-      } else {
+      else {
         doc[n] = v;
       }
     }
@@ -919,6 +1101,11 @@ void setupWebServer() {
         String response;
         serializeJson(errorDoc, response);
         request->send(500, "application/json", response);
+        return;
+      }
+
+      if (!checkAuth(request)) {
+        request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
         return;
       }
 
@@ -1426,6 +1613,157 @@ void setupWebServer() {
     webhooksEnabled = enable;
     Serial.printf("[WEBSERVER] Set webhooksEnabled to %d\n", webhooksEnabled);
     request->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  // Login endpoint
+  server.on("/auth/login", HTTP_POST, [](AsyncWebServerRequest *request) {
+    String password = request->hasParam("password", true) ?
+                      request->getParam("password", true)->value() : "";
+    String totpCode = request->hasParam("totp", true) ?
+                      request->getParam("totp", true)->value() : "";
+
+    if (password != adminPassword) {
+      request->send(401, "application/json", "{\"error\":\"Invalid credentials\"}");
+      return;
+    }
+
+    if (totpEnabled && strlen(totpSecretBase32) > 0) {
+      time_t now = time(nullptr);
+
+      if (now < 1000) {
+        request->send(500, "application/json", "{\"error\":\"Time not synced\"}");
+        return;
+      }
+
+      if (!totp.verify(totpCode, now, 2)) {
+        Serial.println(F("[AUTH] Login failed: TOTP invalid"));
+        request->send(401, "application/json", "{\"error\":\"Invalid credentials\"}");
+        return;
+      }
+      Serial.println(F("[AUTH] Login successful"));
+    }
+
+    sessionToken = "";
+    for (int i = 0; i < 32; i++) {
+      sessionToken += String(random(16), HEX);
+    }
+    sessionExpiry = millis() + (30 * 60 * 1000); // 30 minutes
+
+    DynamicJsonDocument response(256);
+    response["token"] = sessionToken;
+    response["expires"] = sessionExpiry;
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/auth/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument response(256);
+    response["authEnabled"] = authEnabled;
+    response["totpEnabled"] = totpEnabled;
+    response["hasSecret"] = (strlen(totpSecretBase32) > 0);
+    response["hasPassword"] = (strlen(adminPassword) > 0);
+    response["timeSync"] = (time(nullptr) > 1000);
+
+    if (strlen(totpSecretBase32) > 0 && time(nullptr) > 1000) {
+      // Only for debug
+      response["currentCode"] = totp.getCode(time(nullptr));
+    }
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // QR Code endpoint
+  server.on("/auth/qrcode", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (strlen(totpSecretBase32) == 0) {
+      request->send(404, "application/json", "{\"error\":\"No TOTP secret generated\"}");
+      return;
+    }
+
+    String uri = "otpauth://totp/";
+    uri += "ESPTimeCast%3Aadmin";
+    uri += "?secret=";
+    uri += totpSecretBase32;
+    uri += "&issuer=ESPTimeCast";
+    uri += "&algorithm=SHA1";
+    uri += "&digits=6";
+    uri += "&period=30";
+
+    time_t now = time(nullptr);
+    String currentCode = (now > 1000) ? totp.getCode(now) : "000000";
+
+    DynamicJsonDocument doc(512);
+    doc["uri"] = uri;
+    doc["secret"] = totpSecretBase32;
+    doc["currentCode"] = currentCode; // Pour debug
+    doc["algorithm"] = "SHA1";
+    doc["digits"] = 6;
+    doc["period"] = 30;
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
+  // Generate TOTP endpoint
+  server.on("/auth/generate", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!checkAuth(request)) {
+      request->send(401);
+      return;
+    }
+    generateTOTPSecret();
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  server.on("/auth/enable", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!checkAuth(request)) {
+      request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+      return;
+    }
+
+    bool enableTotp = request->hasParam("totp", true) &&
+                      request->getParam("totp", true)->value() == "true";
+
+    if (enableTotp && strlen(totpSecretBase32) == 0) {
+      generateTOTPSecret();
+    }
+
+    totpEnabled = enableTotp;
+
+    DynamicJsonDocument doc(2048);
+    File configFile = LittleFS.open("/config.json", "r");
+    if (configFile) {
+      deserializeJson(doc, configFile);
+      configFile.close();
+    }
+
+    doc["authEnabled"] = authEnabled;
+    doc["totpEnabled"] = totpEnabled;
+
+    File f = LittleFS.open("/config.json", "w");
+    if (f) {
+      serializeJson(doc, f);
+      f.close();
+    }
+
+    DynamicJsonDocument response(256);
+    response["success"] = true;
+    response["totpEnabled"] = totpEnabled;
+    if (enableTotp) {
+      response["secret"] = totpSecretBase32;
+    }
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Login page
+  server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/login.html", "text/html");
   });
 
   server.begin();

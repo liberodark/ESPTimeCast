@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/qrcode.min.js" defer></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ESPTimeCast Settings</title>
@@ -483,6 +484,53 @@ textarea::placeholder {
     <span>Advanced Settings</span>
     </button>
     <div class="collapsible-content" aria-hidden="true">
+
+  <!-- Security Section -->
+  <h3 style="margin-top: 2rem;">🔐 Security</h3>
+
+  <label style="display: flex; align-items: center; justify-content: space-between;">
+    <span>Enable Authentication:</span>
+    <span class="toggle-switch">
+      <input type="checkbox" id="authEnabled" name="authEnabled">
+      <span class="toggle-slider"></span>
+    </span>
+  </label>
+
+  <div id="authSettings" style="display: none; margin-top: 1rem;">
+    <label>Admin Password:</label>
+    <div style="position: relative;">
+      <input type="password" name="adminPassword" id="adminPassword" placeholder="Enter admin password">
+      <label class="small">
+        <input type="checkbox" id="toggleAdminPassword" style="margin-right: 0.3rem;" />
+        Show Password
+      </label>
+    </div>
+
+  <label style="display: flex; align-items: center; margin-top: 1rem; justify-content: space-between;">
+    <span>Enable 2FA (TOTP):</span>
+    <span class="toggle-switch">
+      <input type="checkbox" id="totpEnabled" name="totpEnabled">
+      <span class="toggle-slider"></span>
+    </span>
+  </label>
+
+  <div id="totpSetup" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,122,255,0.1); border-radius: 8px;">
+    <h4 style="margin-top: 0;">📱 Setup 2FA</h4>
+
+    <button type="button" onclick="setupTOTP()" class="primary-button" style="width: 100%;">
+      Generate New Secret
+    </button>
+
+    <div id="qrcode" style="margin: 1rem 0; text-align: center;"></div>
+
+    <div id="totpSecret" style="display: none;">
+      <label>Secret Key (backup):</label>
+      <code style="background: rgba(255,255,255,0.1); padding: 0.5rem; display: block; border-radius: 4px; word-break: break-all;"></code>
+      <div class="small" style="margin-top: 0.5rem;">Save this key!</div>
+    </div>
+  </div>
+  </div>
+
       <label>Primary NTP Server:</label>
       <input type="text" name="ntpServer1" id="ntpServer1" placeholder="Enter NTP address">
 
@@ -763,6 +811,54 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+// Auth settings toggle
+document.getElementById('authEnabled').addEventListener('change', function() {
+  document.getElementById('authSettings').style.display = this.checked ? 'block' : 'none';
+});
+
+document.getElementById('totpEnabled').addEventListener('change', function() {
+  document.getElementById('totpSetup').style.display = this.checked ? 'block' : 'none';
+});
+
+document.getElementById('toggleAdminPassword').addEventListener('change', function() {
+  const passwordInput = document.getElementById('adminPassword');
+  passwordInput.type = this.checked ? 'text' : 'password';
+
+  if (this.checked && passwordInput.value === '********') {
+    passwordInput.value = '';
+    passwordInput.placeholder = 'Enter new password';
+  }
+});
+
+async function setupTOTP() {
+  try {
+    await fetch('/auth/generate', {
+      method: 'POST',
+      headers: {'X-Auth-Token': sessionStorage.getItem('token') || ''}
+    });
+
+    const response = await fetch('/auth/qrcode');
+    const data = await response.json();
+
+    document.getElementById('qrcode').innerHTML = '';
+
+    new QRCode(document.getElementById('qrcode'), {
+      text: data.uri,
+      width: 200,
+      height: 200,
+      colorDark: '#ffffff',
+      colorLight: 'transparent',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+
+    document.getElementById('totpSecret').style.display = 'block';
+    document.querySelector('#totpSecret code').textContent = data.secret;
+
+  } catch (error) {
+    alert('Error generating TOTP secret');
+  }
+}
+
 // Show/Hide Webhook Key toggle
 document.addEventListener("DOMContentLoaded", function () {
   const webhookKeyInput = document.getElementById("webhookKey");
@@ -816,14 +912,35 @@ window.onbeforeunload = function () {
 };
 
 window.onload = function () {
-  fetch('/config.json')
-    .then(response => response.json())
+  fetch('/config.json', {
+      headers: {
+        'X-Auth-Token': sessionStorage.getItem('token') || ''
+      }
+    })
+    .then(response => {
+      if (response.status === 401) {
+        return fetch('/config.json').then(r => {
+          if (r.ok) {
+            return r.json();
+          } else {
+            window.location.href = '/login';
+            return;
+          }
+        });
+      }
+      if (!response.ok) {
+        throw new Error('Failed to load config');
+      }
+      return response.json();
+    })
     .then(data => {
+      if (!data) return;
+
       isAPMode = (data.mode === "ap");
       if (isAPMode) {
-       document.querySelector('.geo-note').style.display = 'block';
-       document.getElementById('geo-button').classList.add('geo-disabled');
-       document.getElementById('geo-button').disabled = true;
+        document.querySelector('.geo-note').style.display = 'block';
+        document.getElementById('geo-button').classList.add('geo-disabled');
+        document.getElementById('geo-button').disabled = true;
       }
 
       document.getElementById('ssid').value = data.ssid || '';
@@ -869,6 +986,16 @@ window.onload = function () {
       document.getElementById('youtubeApiKey').value = (data.youtube && data.youtube.apiKey) || '';
       document.getElementById('youtubeChannelId').value = (data.youtube && data.youtube.channelId) || '';
       document.getElementById('youtubeShortFormat').checked = data.youtube ? data.youtube.shortFormat : true;
+      // Auth
+      document.getElementById('authEnabled').checked = !!data.authEnabled;
+      document.getElementById('adminPassword').value = data.adminPassword || '';
+      document.getElementById('totpEnabled').checked = !!data.totpEnabled;
+      if (data.authEnabled) {
+        document.getElementById('authSettings').style.display = 'block';
+      }
+      if (data.totpEnabled) {
+        document.getElementById('totpSetup').style.display = 'block';
+      }
       // Dimming controls
 const dimmingEnabledEl = document.getElementById('dimmingEnabled');
 const isDimming = (data.dimmingEnabled === true || data.dimmingEnabled === "true" || data.dimmingEnabled === 1);
@@ -1063,6 +1190,10 @@ async function submitConfig(event) {
   formData.set('youtubeApiKey', document.getElementById('youtubeApiKey').value);
   formData.set('youtubeChannelId', document.getElementById('youtubeChannelId').value);
   formData.set('youtubeShortFormat', document.getElementById('youtubeShortFormat').checked ? 'true' : 'false');
+  // --- NEW: Auth Form Data ---
+  formData.set('authEnabled', document.getElementById('authEnabled').checked ? 'on' : '');
+  formData.set('adminPassword', document.getElementById('adminPassword').value);
+  formData.set('totpEnabled', document.getElementById('totpEnabled').checked ? 'on' : '');
   // --- END NEW ---
 
   const params = new URLSearchParams();
@@ -1085,6 +1216,9 @@ async function submitConfig(event) {
 
   fetch('/save', {
     method: 'POST',
+    headers: {
+      'X-Auth-Token': sessionStorage.getItem('token') || ''
+    },
     body: params
   })
   .then(response => {
@@ -1238,7 +1372,12 @@ function restoreBackupConfig() {
   removeReloadButton();
   removeRestoreButton();
 
-  fetch('/restore', { method: 'POST' })
+  fetch('/restore', {
+    method: 'POST',
+    headers: {
+      'X-Auth-Token': sessionStorage.getItem('token') || ''
+    }
+  })
     .then(response => {
       if (!response.ok) {
         throw new Error("Server returned an error");

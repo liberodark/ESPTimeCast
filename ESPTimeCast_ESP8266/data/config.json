@@ -1,6 +1,10 @@
 {
   "ssid": "",
   "password": "",
+  "authEnabled": false,
+  "adminPassword": "",
+  "totpEnabled": false,
+  "totpSecret": "",
   "openMeteoLatitude": "",
   "openMeteoLongitude": "",
   "clockDuration": 10000,
