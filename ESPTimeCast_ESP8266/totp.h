@@ -189,7 +189,7 @@ private:
     }
 
     // Inner hash
-    uint8_t tempBuffer[72];
+    uint8_t tempBuffer[84];
     memcpy(tempBuffer, innerPad, 64);
     memcpy(tempBuffer + 64, data, dataLen);
     sha1(tempBuffer, 64 + dataLen, innerHash);

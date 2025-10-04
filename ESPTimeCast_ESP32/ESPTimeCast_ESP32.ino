@@ -22,9 +22,9 @@
 
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
-#define CLK_PIN 9
-#define CS_PIN 11
-#define DATA_PIN 12
+#define CLK_PIN 18
+#define CS_PIN 2
+#define DATA_PIN 23
 
 MD_Parola P = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 AsyncWebServer server(80);
@@ -1995,11 +1995,17 @@ void fetchWeather() {
     url += "&temperature_unit=celsius";
   }
 
-  Serial.println(F("[WEATHER] URL: ") + url);
+  Serial.print(F("[WEATHER] URL: "));
+  Serial.println(url);
 
-  BearSSL::WiFiClientSecure client;
-  client.setInsecure();
-  client.setBufferSizes(512, 512);
+  #ifdef ESP32
+    WiFiClientSecure client;
+    client.setInsecure();
+  #else
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    client.setBufferSizes(512, 512);
+  #endif
 
   HTTPClient http;
   http.begin(client, url);
@@ -2106,9 +2112,14 @@ void fetchYoutubeSubscribers() {
   url += "&id=" + String(youtubeChannelId);
   url += "&key=" + String(youtubeApiKey);
 
-  BearSSL::WiFiClientSecure client;
-  client.setInsecure();
-  client.setBufferSizes(512, 512);
+  #ifdef ESP32
+    WiFiClientSecure client;
+    client.setInsecure();
+  #else
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    client.setBufferSizes(512, 512);
+  #endif
 
   HTTPClient https;
   https.begin(client, url);
