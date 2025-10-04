@@ -828,8 +828,20 @@ void setupWebServer() {
     request->send(LittleFS, "/index.html", "text/html");
   });
 
-  server.on("/qrcode.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/qrcode.min.js.gz", "application/javascript");
+  server.on("/css/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/css/style.css", "text/css");
+  });
+
+  server.on("/js/app.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/js/app.js", "application/javascript");
+  });
+
+  server.on("/js/login.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/js/login.js", "application/javascript");
+  });
+
+  server.on("/js/qrcode.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/qrcode.min.js.gz", "application/javascript");
     response->addHeader("Content-Encoding", "gzip");
     request->send(response);
   });
