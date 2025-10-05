@@ -1,7 +1,13 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <AsyncTCP.h>
+#ifdef ESP32
+  #include <WiFi.h>
+  #include <HTTPClient.h>
+  #include <AsyncTCP.h>
+#else  // ESP8266
+  #include <ESP8266WiFi.h>
+  #include <ESP8266HTTPClient.h>
+  #include <ESPAsyncTCP.h>
+#endif
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <MD_Parola.h>
@@ -22,9 +28,15 @@
 
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
-#define CLK_PIN 18
-#define CS_PIN 2
-#define DATA_PIN 23
+#ifdef ESP32
+  #define CLK_PIN 18
+  #define DATA_PIN 23
+  #define CS_PIN 2
+#else  // ESP8266
+  #define CLK_PIN 12  // D6
+  #define DATA_PIN 15 // D8
+  #define CS_PIN 13   // D7
+#endif
 
 MD_Parola P = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 AsyncWebServer server(80);
@@ -613,7 +625,11 @@ void connectWiFi() {
   while (animating) {
     unsigned long now = millis();
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("[WiFi] Connected: " + WiFi.localIP().toString());
+      #ifdef ESP32
+        Serial.println("[WIFI] Connected: " + WiFi.localIP().toString());
+      #else  // ESP8266
+        Serial.println(F("[WIFI] Connected: ") + WiFi.localIP().toString());
+      #endif
       isAPMode = false;
 
       WiFiMode_t mode = WiFi.getMode();
@@ -644,7 +660,11 @@ void connectWiFi() {
       dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
       isAPMode = true;
 
-      auto mode = WiFi.getMode();
+      #ifdef ESP32
+        auto mode = WiFi.getMode();
+      #else  // ESP8266
+        WiFiMode_t mode = WiFi.getMode();
+      #endif
       Serial.printf("[WIFI] WiFi mode after STA failure and setting AP: %s\n",
                     mode == WIFI_OFF ? "OFF" : mode == WIFI_STA    ? "STA ONLY"
                                              : mode == WIFI_AP     ? "AP ONLY"
@@ -665,7 +685,11 @@ void connectWiFi() {
       }
       animFrame++;
     }
-    delay(1);
+    #ifdef ESP32
+      delay(1);
+    #else // ESP8266
+      yield();
+    #endif
   }
 }
 
@@ -706,6 +730,9 @@ void clearWiFiCredentialsInConfig() {
 // Time / NTP Functions
 // -----------------------------------------------------------------------------
 void setupTime() {
+  #ifdef ESP8266
+    sntp_stop();  // ESP8266 needs explicit stop before reconfiguring
+  #endif
   if (!isAPMode) {
     Serial.println(F("[TIME] Starting NTP sync"));
   }
@@ -737,7 +764,6 @@ void setupTime() {
     ntpStartTime = millis();  // start the failed timer (so retry delay counts from now)
   }
 }
-
 
 // -----------------------------------------------------------------------------
 // Utility
@@ -1040,9 +1066,15 @@ void setupWebServer() {
     youtubeObj["channelId"] = youtubeChannelIdStr;
     youtubeObj["shortFormat"] = newYoutubeShortFormat;
 
-    size_t total = LittleFS.totalBytes();
-    size_t used = LittleFS.usedBytes();
-    Serial.printf("[SAVE] LittleFS total bytes: %llu, used bytes: %llu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
+    #ifdef ESP32
+      size_t total = LittleFS.totalBytes();
+      size_t used = LittleFS.usedBytes();
+      Serial.printf("[SAVE] LittleFS total bytes: %llu, used bytes: %llu\n", LittleFS.totalBytes(), LittleFS.usedBytes());
+    #else  // ESP8266
+      FSInfo fs_info;
+      LittleFS.info(fs_info);
+      Serial.printf("[SAVE] LittleFS total bytes: %u, used bytes: %u\n", fs_info.totalBytes, fs_info.usedBytes);
+    #endif
 
     if (LittleFS.exists("/config.json")) {
       Serial.println(F("[SAVE] Renaming /config.json to /config.bak"));
@@ -1378,7 +1410,6 @@ void setupWebServer() {
     Serial.printf("[WEBSERVER] Set Countdown Enabled to %d\n", countdownEnabled);
     request->send(200, "application/json", "{\"ok\":true}");
   });
-
 
   server.on("/set_dramatic_countdown", HTTP_POST, [](AsyncWebServerRequest *request) {
     bool enableDramaticNow = false;
@@ -1806,8 +1837,6 @@ void handleCaptivePortal(AsyncWebServerRequest *request) {
   request->redirect(String("http://") + WiFi.softAPIP().toString() + "/");
 }
 
-
-
 String normalizeWeatherDescription(String str) {
   // Serbian Cyrillic → Latin
   str.replace("а", "a");
@@ -2031,7 +2060,7 @@ void fetchWeather() {
   #ifdef ESP32
     WiFiClientSecure client;
     client.setInsecure();
-  #else
+  #else // ESP8266
     BearSSL::WiFiClientSecure client;
     client.setInsecure();
     client.setBufferSizes(512, 512);
@@ -2145,7 +2174,7 @@ void fetchYoutubeSubscribers() {
   #ifdef ESP32
     WiFiClientSecure client;
     client.setInsecure();
-  #else
+  #else // ESP8266
     BearSSL::WiFiClientSecure client;
     client.setInsecure();
     client.setBufferSizes(512, 512);
@@ -2203,7 +2232,11 @@ void setup() {
   Serial.println();
   Serial.println(F("[SETUP] Starting setup..."));
 
-  if (!LittleFS.begin(true)) {
+  #ifdef ESP32
+    if (!LittleFS.begin(true)) {
+  #else  // ESP8266
+    if (!LittleFS.begin()) {
+  #endif
     Serial.println(F("[ERROR] LittleFS mount failed in setup! Halting."));
     while (true) {
       delay(1000);
@@ -2244,8 +2277,6 @@ void setup() {
   lastSwitch = millis();
   lastColonBlink = millis();
 }
-
-
 
 void advanceDisplayMode() {
   int oldMode = displayMode;
@@ -2565,8 +2596,6 @@ void loop() {
     }
   }
 
-
-
   // --- IMMEDIATE COUNTDOWN FINISH TRIGGER ---
   if (countdownEnabled && !countdownFinished && ntpSyncSuccessful && countdownTargetTimestamp > 0 && now_time >= countdownTargetTimestamp) {
     countdownFinished = true;
@@ -2708,7 +2737,6 @@ void loop() {
 
   const char *const *daysOfTheWeek = getDaysOfWeek(language);
   const char *daySymbol = daysOfTheWeek[timeinfo.tm_wday];
-
 
   // build base HH:MM first ---
   char baseTime[9];
@@ -3268,8 +3296,12 @@ void loop() {
       client.setInsecure();
       HTTPClient https;
       https.begin(client, ntpField);
-      https.setConnectTimeout(5000);
-      https.setTimeout(5000);
+      #ifdef ESP32
+        https.setConnectTimeout(5000);
+        https.setTimeout(5000);
+      #else  // ESP8266
+        https.setTimeout(5000);  // Sets both connection and response timeout
+      #endif
 
       Serial.print("[HTTPS] Nightscout fetch initiated...\n");
       int httpCode = https.GET();
@@ -3515,6 +3547,5 @@ void loop() {
       advanceDisplayMode();
     }
   }
-
   yield();
 }
