@@ -276,6 +276,17 @@ bool checkAuth(AsyncWebServerRequest *request) {
   return false;
 }
 
+bool secureCompare(const char* a, const char* b) {
+  size_t len = strlen(b);
+  if (strlen(a) != len) return false;
+
+  uint8_t result = 0;
+  for (size_t i = 0; i < len; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result == 0;
+}
+
 void base32_encode(const uint8_t *data, int length, char *result, int resultSize) {
   const char *base32_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   int count = 0;
@@ -1530,7 +1541,7 @@ void setupWebServer() {
 
     // Validate key
     if (!request->hasParam("key", true) ||
-        strcmp(request->getParam("key", true)->value().c_str(), webhookKey) != 0) {
+        !secureCompare(request->getParam("key", true)->value().c_str(), webhookKey)) {
       Serial.println(F("[WEBHOOK] Invalid key"));
       request->send(403, "application/json", "{\"error\":\"Invalid key\"}");
       return;
