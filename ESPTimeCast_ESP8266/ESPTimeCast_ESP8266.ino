@@ -829,20 +829,27 @@ void setupWebServer() {
   });
 
   server.on("/css/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/css/style.css", "text/css");
+    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/css/style.css", "text/css");
+    response->addHeader("Cache-Control", "public, max-age=31536000");
+    request->send(response);
   });
 
   server.on("/js/app.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/js/app.js", "application/javascript");
+    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/app.js", "application/javascript");
+    response->addHeader("Cache-Control", "public, max-age=604800");
+    request->send(response);
   });
 
   server.on("/js/login.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/js/login.js", "application/javascript");
+    AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/login.js", "application/javascript");
+    response->addHeader("Cache-Control", "public, max-age=604800");
+    request->send(response);
   });
 
   server.on("/js/qrcode.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/qrcode.min.js.gz", "application/javascript");
     response->addHeader("Content-Encoding", "gzip");
+    response->addHeader("Cache-Control", "public, max-age=31536000");
     request->send(response);
   });
 
