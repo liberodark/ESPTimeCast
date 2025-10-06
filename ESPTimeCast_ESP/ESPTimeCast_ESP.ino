@@ -371,6 +371,161 @@ textEffect_t getEffectiveScrollDirection(textEffect_t desiredDirection, bool isF
   return desiredDirection;
 }
 
+// Normalize text for LED display
+String normalizeDisplayText(String str, bool weatherMode = false) {
+  // Serbian Cyrillic → Latin
+  str.replace("а", "a");
+  str.replace("б", "b");
+  str.replace("в", "v");
+  str.replace("г", "g");
+  str.replace("д", "d");
+  str.replace("ђ", "dj");
+  str.replace("е", "e");
+  str.replace("ё", "e");  // Russian
+  str.replace("ж", "z");
+  str.replace("з", "z");
+  str.replace("и", "i");
+  str.replace("й", "j");  // Russian
+  str.replace("ј", "j");  // Serbian
+  str.replace("к", "k");
+  str.replace("л", "l");
+  str.replace("љ", "lj");
+  str.replace("м", "m");
+  str.replace("н", "n");
+  str.replace("њ", "nj");
+  str.replace("о", "o");
+  str.replace("п", "p");
+  str.replace("р", "r");
+  str.replace("с", "s");
+  str.replace("т", "t");
+  str.replace("ћ", "c");
+  str.replace("у", "u");
+  str.replace("ф", "f");
+  str.replace("х", "h");
+  str.replace("ц", "c");
+  str.replace("ч", "c");
+  str.replace("џ", "dz");
+  str.replace("ш", "s");
+  str.replace("щ", "sh");  // Russian
+  str.replace("ы", "y");   // Russian
+  str.replace("э", "e");   // Russian
+  str.replace("ю", "yu");  // Russian
+  str.replace("я", "ya");  // Russian
+
+  // Latin diacritics → ASCII
+  str.replace("å", "a");
+  str.replace("ä", "a");
+  str.replace("à", "a");
+  str.replace("á", "a");
+  str.replace("â", "a");
+  str.replace("ã", "a");
+  str.replace("ā", "a");
+  str.replace("ă", "a");
+  str.replace("ą", "a");
+
+  str.replace("æ", "ae");
+
+  str.replace("ç", "c");
+  str.replace("č", "c");
+  str.replace("ć", "c");
+
+  str.replace("ď", "d");
+
+  str.replace("é", "e");
+  str.replace("è", "e");
+  str.replace("ê", "e");
+  str.replace("ë", "e");
+  str.replace("ē", "e");
+  str.replace("ė", "e");
+  str.replace("ę", "e");
+
+  str.replace("ğ", "g");
+  str.replace("ģ", "g");
+
+  str.replace("ĥ", "h");
+
+  str.replace("í", "i");
+  str.replace("ì", "i");
+  str.replace("î", "i");
+  str.replace("ï", "i");
+  str.replace("ī", "i");
+  str.replace("į", "i");
+
+  str.replace("ĵ", "j");
+
+  str.replace("ķ", "k");
+
+  str.replace("ľ", "l");
+  str.replace("ł", "l");
+
+  str.replace("ñ", "n");
+  str.replace("ń", "n");
+  str.replace("ņ", "n");
+
+  str.replace("ó", "o");
+  str.replace("ò", "o");
+  str.replace("ô", "o");
+  str.replace("ö", "o");
+  str.replace("õ", "o");
+  str.replace("ø", "o");
+  str.replace("ō", "o");
+  str.replace("ő", "o");
+
+  str.replace("œ", "oe");
+
+  str.replace("ŕ", "r");
+
+  str.replace("ś", "s");
+  str.replace("š", "s");
+  str.replace("ș", "s");
+  str.replace("ŝ", "s");
+
+  str.replace("ß", "ss");
+
+  str.replace("ť", "t");
+  str.replace("ț", "t");
+
+  str.replace("ú", "u");
+  str.replace("ù", "u");
+  str.replace("û", "u");
+  str.replace("ü", "u");
+  str.replace("ū", "u");
+  str.replace("ů", "u");
+  str.replace("ű", "u");
+
+  str.replace("ŵ", "w");
+
+  str.replace("ý", "y");
+  str.replace("ÿ", "y");
+  str.replace("ŷ", "y");
+
+  str.replace("ž", "z");
+  str.replace("ź", "z");
+  str.replace("ż", "z");
+
+  str.toUpperCase();
+
+  String result = "";
+  for (unsigned int i = 0; i < str.length(); i++) {
+    char c = str.charAt(i);
+
+    if (weatherMode) {
+      if ((c >= 'A' && c <= 'Z') || c == ' ') {
+        result += c;
+      }
+    }
+
+    else {
+      if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+          c == ' ' || c == '.' || c == ',' || c == '!' ||
+          c == ':' || c == '-' || c == '_' || c == '%') {
+        result += c;
+      }
+    }
+  }
+  return result;
+}
+
 // -----------------------------------------------------------------------------
 // Configuration Load & Save
 // -----------------------------------------------------------------------------
@@ -1455,8 +1610,7 @@ void setupWebServer() {
       return;
     }
 
-    customMessage = request->getParam("text", true)->value();
-    customMessage.toUpperCase();
+    customMessage = normalizeDisplayText(request->getParam("text", true)->value());
 
     if (request->hasParam("duration", true)) {
       int dur = request->getParam("duration", true)->value().toInt();
@@ -1606,9 +1760,9 @@ void setupWebServer() {
 
     // Parse message
     WebhookMessage msg;
-    msg.text = request->hasParam("message", true) ?
+    String rawMessage = request->hasParam("message", true) ?
                request->getParam("message", true)->value() : "WEBHOOK";
-    msg.text.toUpperCase();
+    msg.text = normalizeDisplayText(rawMessage);
 
     msg.priority = request->hasParam("priority", true) ?
                    request->getParam("priority", true)->value().toInt() : 1;
@@ -1837,149 +1991,6 @@ void handleCaptivePortal(AsyncWebServerRequest *request) {
   request->redirect(String("http://") + WiFi.softAPIP().toString() + "/");
 }
 
-String normalizeWeatherDescription(String str) {
-  // Serbian Cyrillic → Latin
-  str.replace("а", "a");
-  str.replace("б", "b");
-  str.replace("в", "v");
-  str.replace("г", "g");
-  str.replace("д", "d");
-  str.replace("ђ", "dj");
-  str.replace("е", "e");
-  str.replace("ё", "e");  // Russian
-  str.replace("ж", "z");
-  str.replace("з", "z");
-  str.replace("и", "i");
-  str.replace("й", "j");  // Russian
-  str.replace("ј", "j");  // Serbian
-  str.replace("к", "k");
-  str.replace("л", "l");
-  str.replace("љ", "lj");
-  str.replace("м", "m");
-  str.replace("н", "n");
-  str.replace("њ", "nj");
-  str.replace("о", "o");
-  str.replace("п", "p");
-  str.replace("р", "r");
-  str.replace("с", "s");
-  str.replace("т", "t");
-  str.replace("ћ", "c");
-  str.replace("у", "u");
-  str.replace("ф", "f");
-  str.replace("х", "h");
-  str.replace("ц", "c");
-  str.replace("ч", "c");
-  str.replace("џ", "dz");
-  str.replace("ш", "s");
-  str.replace("щ", "sh");  // Russian
-  str.replace("ы", "y");   // Russian
-  str.replace("э", "e");   // Russian
-  str.replace("ю", "yu");  // Russian
-  str.replace("я", "ya");  // Russian
-
-  // Latin diacritics → ASCII
-  str.replace("å", "a");
-  str.replace("ä", "a");
-  str.replace("à", "a");
-  str.replace("á", "a");
-  str.replace("â", "a");
-  str.replace("ã", "a");
-  str.replace("ā", "a");
-  str.replace("ă", "a");
-  str.replace("ą", "a");
-
-  str.replace("æ", "ae");
-
-  str.replace("ç", "c");
-  str.replace("č", "c");
-  str.replace("ć", "c");
-
-  str.replace("ď", "d");
-
-  str.replace("é", "e");
-  str.replace("è", "e");
-  str.replace("ê", "e");
-  str.replace("ë", "e");
-  str.replace("ē", "e");
-  str.replace("ė", "e");
-  str.replace("ę", "e");
-
-  str.replace("ğ", "g");
-  str.replace("ģ", "g");
-
-  str.replace("ĥ", "h");
-
-  str.replace("í", "i");
-  str.replace("ì", "i");
-  str.replace("î", "i");
-  str.replace("ï", "i");
-  str.replace("ī", "i");
-  str.replace("į", "i");
-
-  str.replace("ĵ", "j");
-
-  str.replace("ķ", "k");
-
-  str.replace("ľ", "l");
-  str.replace("ł", "l");
-
-  str.replace("ñ", "n");
-  str.replace("ń", "n");
-  str.replace("ņ", "n");
-
-  str.replace("ó", "o");
-  str.replace("ò", "o");
-  str.replace("ô", "o");
-  str.replace("ö", "o");
-  str.replace("õ", "o");
-  str.replace("ø", "o");
-  str.replace("ō", "o");
-  str.replace("ő", "o");
-
-  str.replace("œ", "oe");
-
-  str.replace("ŕ", "r");
-
-  str.replace("ś", "s");
-  str.replace("š", "s");
-  str.replace("ș", "s");
-  str.replace("ŝ", "s");
-
-  str.replace("ß", "ss");
-
-  str.replace("ť", "t");
-  str.replace("ț", "t");
-
-  str.replace("ú", "u");
-  str.replace("ù", "u");
-  str.replace("û", "u");
-  str.replace("ü", "u");
-  str.replace("ū", "u");
-  str.replace("ů", "u");
-  str.replace("ű", "u");
-
-  str.replace("ŵ", "w");
-
-  str.replace("ý", "y");
-  str.replace("ÿ", "y");
-  str.replace("ŷ", "y");
-
-  str.replace("ž", "z");
-  str.replace("ź", "z");
-  str.replace("ż", "z");
-
-  str.toUpperCase();
-
-  String result = "";
-  for (unsigned int i = 0; i < str.length(); i++) {
-    char c = str.charAt(i);
-    if ((c >= 'A' && c <= 'Z') || c == ' ') {
-      result += c;
-    }
-  }
-  return result;
-}
-
 bool isNumber(const char *str) {
   for (int i = 0; str[i]; i++) {
     if (!isdigit(str[i]) && str[i] != '.' && str[i] != '-') return false;
@@ -2021,7 +2032,7 @@ String getWeatherDescription(int code, const char* lang) {
     }
   }
 
-  return normalizeWeatherDescription(desc);
+  return normalizeDisplayText(desc, true);
 }
 
 void fetchWeather() {
