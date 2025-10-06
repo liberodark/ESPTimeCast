@@ -7,8 +7,10 @@
 // Compatibility macro for ESP8266/ESP32
 #ifdef ESP32
   #define WDT_FEED() yield()
-#else
-  #define WDT_FEED() ESP.wdtFeed()
+#else // ESP8266
+  #ifndef WDT_FEED
+    #define WDT_FEED() ESP.wdtFeed()
+  #endif
 #endif
 
 class SimpleTOTP {
