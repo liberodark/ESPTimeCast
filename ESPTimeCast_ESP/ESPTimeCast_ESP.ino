@@ -24,6 +24,7 @@
 #include "tz_lookup.h"      // Timezone lookup, do not duplicate mapping here!
 #include "days_lookup.h"    // Languages for the Days of the Week
 #include "months_lookup.h"  // Languages for the Months of the Year
+#include "weather_lookup.h" // Languages for the Weather
 #include "totp.h"           // TOTP
 
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
@@ -2039,37 +2040,8 @@ bool isNumber(const char *str) {
 // Weather Fetching
 // -----------------------------------------------------------------------------
 String getWeatherDescription(int code, const char* lang) {
-  String desc = "";
-
-  switch(code) {
-    case 0: desc = "CLEAR"; break;
-    case 1: case 2: desc = "PARTLY CLOUDY"; break;
-    case 3: desc = "CLOUDY"; break;
-    case 45: case 48: desc = "FOG"; break;
-    case 51: case 53: case 55: desc = "DRIZZLE"; break;
-    case 61: case 63: desc = "RAIN"; break;
-    case 65: desc = "HEAVY RAIN"; break;
-    case 71: case 73: case 75: desc = "SNOW"; break;
-    case 77: desc = "SNOW GRAINS"; break;
-    case 80: case 81: case 82: desc = "SHOWERS"; break;
-    case 85: case 86: desc = "SNOW SHOWERS"; break;
-    case 95: desc = "THUNDERSTORM"; break;
-    case 96: case 99: desc = "THUNDERSTORM HAIL"; break;
-    default: desc = "UNKNOWN"; break;
-  }
-
-  if (strcmp(lang, "fr") == 0) {
-    switch(code) {
-      case 0: desc = "CLAIR"; break;
-      case 1: case 2: case 3: desc = "NUAGEUX"; break;
-      case 45: case 48: desc = "BROUILLARD"; break;
-      case 61: case 63: case 65: desc = "PLUIE"; break;
-      case 71: case 73: case 75: case 77: desc = "NEIGE"; break;
-      case 95: case 96: case 99: desc = "ORAGE"; break;
-    }
-  }
-
-  return normalizeDisplayText(desc, true);
+  const char* description = getWeatherByCode(code, lang);
+  return normalizeDisplayText(String(description), true);
 }
 
 void fetchOpenWeather() {
@@ -2148,6 +2120,7 @@ void fetchOpenWeather() {
     if (doc["weather"][0]["description"]) {
       String desc = doc["weather"][0]["description"].as<String>();
       weatherDescription = normalizeDisplayText(desc, true);
+      translateAPIWeatherTerms(weatherDescription, language);
       Serial.printf("[WEATHER] Description: %s\n", weatherDescription.c_str());
     }
 
@@ -2231,6 +2204,7 @@ void fetchPirateWeather() {
     if (doc["currently"]["summary"]) {
       String desc = doc["currently"]["summary"].as<String>();
       weatherDescription = normalizeDisplayText(desc, true);
+      translateAPIWeatherTerms(weatherDescription, language);
       Serial.printf("[WEATHER] Description: %s\n", weatherDescription.c_str());
     }
 
