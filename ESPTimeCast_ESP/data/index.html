@@ -25,6 +25,27 @@
     </label>
   </div>
   <h2>Weather Settings</h2>
+  <label>Weather Provider</label>
+  <select id="weatherProvider" name="weatherProvider" onchange="toggleWeatherApiKey(this.value)">
+    <option value="openmeteo">Open-Meteo (Free, No Key)</option>
+    <option value="openweather">OpenWeatherMap (More Precise)</option>
+    <option value="pirateweather">PirateWeather (Dark Sky API)</option>
+  </select>
+
+  <div id="weatherApiKeySection" style="display: none; margin-top: 1rem;">
+    <label>OpenWeatherMap API Key</label>
+    <input type="password" id="weatherApiKey" name="weatherApiKey" placeholder="Enter API key">
+    <label class="small">
+      <input type="checkbox" id="toggleWeatherApiKey" style="margin-right: 0.3rem;" />
+      Show API Key
+    </label>
+    <div class="small" style="margin-top: 0.5rem;">
+      Get your free API key at:<br>
+      OpenWeatherMap: <a href="https://openweathermap.org/api" target="_blank">openweathermap.org</a><br>
+      PirateWeather: <a href="https://pirateweather.net" target="_blank">pirateweather.net</a>
+    </div>
+  </div>
+
   <label>Location (GPS Coordinates)</label>
   <div class="form-row two-col">
     <input type="text" id="openMeteoLatitude" name="openMeteoLatitude" placeholder="Latitude (e.g. 48.8566)"/>

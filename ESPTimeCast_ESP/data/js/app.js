@@ -6,6 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
     brightnessValue.textContent = brightnessSlider.value;
 });
 
+function toggleWeatherApiKey(provider) {
+  const apiKeySection = document.getElementById('weatherApiKeySection');
+  apiKeySection.style.display = (provider === 'openweather' || provider === 'pirateweather') ? 'block' : 'none';
+}
+
 // Show/Hide Password toggle
 document.addEventListener("DOMContentLoaded", function () {
     const passwordInput = document.getElementById("password");
@@ -31,6 +36,29 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
     });
+});
+
+// Show/Hide Weather API Key toggle
+document.addEventListener("DOMContentLoaded", function () {
+  const weatherApiKeyInput = document.getElementById("weatherApiKey");
+  const toggleWeatherApiKeyCheckbox = document.getElementById("toggleWeatherApiKey");
+
+  if (toggleWeatherApiKeyCheckbox && weatherApiKeyInput) {
+    toggleWeatherApiKeyCheckbox.addEventListener("change", function () {
+      if (this.checked) {
+        weatherApiKeyInput.type = "text";
+        if (weatherApiKeyInput.value === "********") {
+          weatherApiKeyInput.value = "";
+          weatherApiKeyInput.placeholder = "Enter new API key";
+        }
+      } else {
+        weatherApiKeyInput.type = "password";
+        if (weatherApiKeyInput.placeholder === "Enter new API key") {
+          weatherApiKeyInput.placeholder = "Enter API key";
+        }
+      }
+    });
+  }
 });
 
 // Auth settings toggle
@@ -173,6 +201,10 @@ window.onload = function () {
             document.getElementById('clockDuration').value = (data.clockDuration || 10000) / 1000;
             document.getElementById('weatherDuration').value = (data.weatherDuration || 5000) / 1000;
             document.getElementById('language').value = data.language || '';
+            // Weather provider
+            document.getElementById('weatherProvider').value = data.weatherProvider || 'openmeteo';
+            document.getElementById('weatherApiKey').value = data.weatherApiKey || '';
+            toggleWeatherApiKey(data.weatherProvider || 'openmeteo');
             // Advanced:
             document.getElementById('brightnessSlider').value = typeof data.brightness !== "undefined" ? data.brightness : 10;
             document.getElementById('brightnessValue').textContent = (document.getElementById('brightnessSlider').value == -1 ? 'Off' : document.getElementById('brightnessSlider').value);

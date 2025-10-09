@@ -100,6 +100,15 @@ WiFiClient client;
 const byte DNS_PORT = 53;
 DNSServer dnsServer;
 
+// Weather provider settings
+enum WeatherProviderType {
+  PROVIDER_OPEN_METEO,
+  PROVIDER_OPEN_WEATHER,
+  PROVIDER_PIRATE_WEATHER
+};
+WeatherProviderType weatherProvider = PROVIDER_OPEN_METEO;
+char weatherApiKey[65] = "";
+
 String currentTemp = "";
 String weatherDescription = "";
 bool showWeatherDescription = false;
@@ -217,6 +226,14 @@ const char *getSafePassword() {
 
 const char *getSafeAdminPassword() {
   if (strlen(adminPassword) == 0) {
+    return "";
+  } else {
+    return "********";
+  }
+}
+
+const char *getSafeWeatherApiKey() {
+  if (strlen(weatherApiKey) == 0) {
     return "";
   } else {
     return "********";
@@ -547,6 +564,8 @@ void loadConfig() {
     doc[F("weatherUnits")] = "metric";
     doc[F("clockDuration")] = 10000;
     doc[F("weatherDuration")] = 5000;
+    doc[F("weatherProvider")] = "openmeteo";
+    doc[F("weatherApiKey")] = "";
     doc[F("timeZone")] = "";
     doc[F("language")] = "en";
     doc[F("brightness")] = brightness;
@@ -666,6 +685,17 @@ void loadConfig() {
 
   strlcpy(ntpServer1, doc["ntpServer1"] | "pool.ntp.org", sizeof(ntpServer1));
   strlcpy(ntpServer2, doc["ntpServer2"] | "time.nist.gov", sizeof(ntpServer2));
+
+  // Weather provider
+  String provider = doc["weatherProvider"] | "openmeteo";
+  if (provider == "openweather") {
+    weatherProvider = PROVIDER_OPEN_WEATHER;
+  } else if (provider == "pirateweather") {
+    weatherProvider = PROVIDER_PIRATE_WEATHER;
+  } else {
+    weatherProvider = PROVIDER_OPEN_METEO;
+  }
+  strlcpy(weatherApiKey, doc["weatherApiKey"] | "", sizeof(weatherApiKey));
 
   if (strcmp(weatherUnits, "imperial") == 0)
     tempSymbol = ']';
@@ -1072,6 +1102,7 @@ void setupWebServer() {
     doc[F("ssid")] = getSafeSsid();
     doc[F("password")] = getSafePassword();
     doc["adminPassword"] = getSafeAdminPassword();
+    doc["weatherApiKey"] = getSafeWeatherApiKey();
     doc[F("mode")] = isAPMode ? "ap" : "sta";
 
     if (doc["youtube"]) doc["youtube"]["apiKey"] = getSafeYoutubeApiKey();
@@ -1126,6 +1157,12 @@ void setupWebServer() {
       else if (n == "showWeatherDescription") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "dimmingEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "weatherUnits") doc[n] = v;
+      else if (n == "weatherProvider") doc[n] = v;
+      else if (n == "weatherApiKey") {
+      if (v != "********" && v.length() > 0) {
+        doc[n] = v;
+        }
+      }
       else if (n == "apiEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "webhooksEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "webhookKey") {
@@ -2035,24 +2072,183 @@ String getWeatherDescription(int code, const char* lang) {
   return normalizeDisplayText(desc, true);
 }
 
-void fetchWeather() {
-  Serial.println(F("[WEATHER] Fetching weather data from Open-Meteo..."));
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println(F("[WEATHER] Skipped: WiFi not connected"));
+void fetchOpenWeather() {
+  Serial.println(F("[WEATHER] Fetching weather data from OpenWeatherMap..."));
+
+  if (strlen(weatherApiKey) == 0) {
+    Serial.println(F("[WEATHER] No API key for OpenWeatherMap"));
     weatherAvailable = false;
-    weatherFetched = false;
     return;
   }
 
   float lat = atof(openMeteoLatitude);
   float lon = atof(openMeteoLongitude);
 
-  if (!isNumber(openMeteoLatitude) || !isNumber(openMeteoLongitude) ||
-      lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
-    Serial.println(F("[WEATHER] Skipped: Need valid coordinates (use Get My Location button)"));
+  String url = "https://api.openweathermap.org/data/2.5/weather?";
+  url += "lat=" + String(lat, 6);
+  url += "&lon=" + String(lon, 6);
+  url += "&appid=" + String(weatherApiKey);
+
+  if (strcmp(language, "en") != 0) {
+    url += "&lang=" + String(language);
+  }
+
+  if (strcmp(weatherUnits, "imperial") == 0) {
+    url += "&units=imperial";
+  } else {
+    url += "&units=metric";
+  }
+
+  Serial.print(F("[WEATHER] URL: "));
+  Serial.println(url);
+
+  #ifdef ESP32
+    WiFiClientSecure client;
+    client.setInsecure();
+  #else // ESP8266
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    client.setBufferSizes(512, 512);
+  #endif
+
+  HTTPClient http;
+  http.begin(client, url);
+  http.setTimeout(5000);
+  http.setReuse(false);
+
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.println(F("[WEATHER] Response received."));
+
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (error) {
+      Serial.print(F("[WEATHER] JSON parse error: "));
+      Serial.println(error.f_str());
+      weatherAvailable = false;
+      http.end();
+      return;
+    }
+
+    if (doc["main"]["temp"]) {
+      float temp = doc["main"]["temp"];
+      currentTemp = String((int)round(temp)) + "º";
+      weatherAvailable = true;
+      Serial.printf("[WEATHER] Temp: %s\n", currentTemp.c_str());
+    }
+
+    if (doc["main"]["humidity"]) {
+      currentHumidity = doc["main"]["humidity"];
+      Serial.printf("[WEATHER] Humidity: %d%%\n", currentHumidity);
+    }
+
+    if (doc["weather"][0]["description"]) {
+      String desc = doc["weather"][0]["description"].as<String>();
+      weatherDescription = normalizeDisplayText(desc, true);
+      Serial.printf("[WEATHER] Description: %s\n", weatherDescription.c_str());
+    }
+
+    weatherFetched = true;
+  } else if (httpCode == 401) {
+    Serial.println(F("[WEATHER] Invalid API key"));
+    weatherAvailable = false;
+  } else {
+    Serial.printf("[WEATHER] HTTP GET failed, code: %d\n", httpCode);
+    weatherAvailable = false;
+  }
+
+  http.end();
+  client.stop();
+}
+
+void fetchPirateWeather() {
+  Serial.println(F("[WEATHER] Fetching from PirateWeather..."));
+
+  if (strlen(weatherApiKey) == 0) {
+    Serial.println(F("[WEATHER] No API key for PirateWeather"));
     weatherAvailable = false;
     return;
   }
+
+  float lat = atof(openMeteoLatitude);
+  float lon = atof(openMeteoLongitude);
+
+  String url = "https://api.pirateweather.net/forecast/";
+  url += String(weatherApiKey) + "/";
+  url += String(lat, 6) + "," + String(lon, 6);
+  url += "?units=" + String(strcmp(weatherUnits, "imperial") == 0 ? "us" : "si");
+
+  Serial.print(F("[WEATHER] URL: "));
+  Serial.println(url);
+
+  #ifdef ESP32
+    WiFiClientSecure client;
+    client.setInsecure();
+  #else
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    client.setBufferSizes(512, 512);
+  #endif
+
+  HTTPClient http;
+  http.begin(client, url);
+  http.setTimeout(5000);
+  http.setReuse(false);
+
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.println(F("[WEATHER] Response received."));
+
+    StaticJsonDocument<2048> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (error) {
+      Serial.print(F("[WEATHER] JSON parse error: "));
+      Serial.println(error.f_str());
+      weatherAvailable = false;
+      http.end();
+      return;
+    }
+
+    if (doc["currently"]["temperature"]) {
+      float temp = doc["currently"]["temperature"];
+      currentTemp = String((int)round(temp)) + "º";
+      weatherAvailable = true;
+      Serial.printf("[WEATHER] Temp: %s\n", currentTemp.c_str());
+    }
+
+    if (doc["currently"]["humidity"]) {
+      float hum = doc["currently"]["humidity"];
+      currentHumidity = (int)(hum * 100);
+      Serial.printf("[WEATHER] Humidity: %d%%\n", currentHumidity);
+    }
+
+    if (doc["currently"]["summary"]) {
+      String desc = doc["currently"]["summary"].as<String>();
+      weatherDescription = normalizeDisplayText(desc, true);
+      Serial.printf("[WEATHER] Description: %s\n", weatherDescription.c_str());
+    }
+
+    weatherFetched = true;
+  } else {
+    Serial.printf("[WEATHER] HTTP GET failed, code: %d\n", httpCode);
+    weatherAvailable = false;
+  }
+
+  http.end();
+  client.stop();
+}
+
+void fetchOpenMeteo() {
+  Serial.println(F("[WEATHER] Fetching weather data from Open-Meteo..."));
+
+  float lat = atof(openMeteoLatitude);
+  float lon = atof(openMeteoLongitude);
 
   String url = "https://api.open-meteo.com/v1/forecast?";
   url += "latitude=" + String(lat, 6);
@@ -2125,6 +2321,33 @@ void fetchWeather() {
 
   http.end();
   client.stop();
+}
+
+void fetchWeather() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println(F("[WEATHER] Skipped: WiFi not connected"));
+    weatherAvailable = false;
+    weatherFetched = false;
+    return;
+  }
+
+  float lat = atof(openMeteoLatitude);
+  float lon = atof(openMeteoLongitude);
+
+  if (!isNumber(openMeteoLatitude) || !isNumber(openMeteoLongitude) ||
+      lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+    Serial.println(F("[WEATHER] Skipped: Need valid coordinates"));
+    weatherAvailable = false;
+    return;
+  }
+
+  if (weatherProvider == PROVIDER_OPEN_WEATHER) {
+    fetchOpenWeather();
+  } else if (weatherProvider == PROVIDER_PIRATE_WEATHER) {
+    fetchPirateWeather();
+  } else {
+    fetchOpenMeteo();
+  }
 }
 
 // -----------------------------------------------------------------------------

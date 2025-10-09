@@ -7,6 +7,8 @@
   "totpSecret": "",
   "openMeteoLatitude": "",
   "openMeteoLongitude": "",
+  "weatherProvider": "openmeteo",
+  "weatherApiKey": "",
   "clockDuration": 10000,
   "weatherDuration": 5000,
   "timeZone": "",
