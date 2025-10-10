@@ -2153,6 +2153,7 @@ void fetchPirateWeather() {
   url += String(weatherApiKey) + "/";
   url += String(lat, 6) + "," + String(lon, 6);
   url += "?units=" + String(strcmp(weatherUnits, "imperial") == 0 ? "us" : "si");
+  url += "&exclude=minutely,hourly,daily,alerts,flags";
 
   Serial.print(F("[WEATHER] URL: "));
   Serial.println(url);
@@ -2161,9 +2162,12 @@ void fetchPirateWeather() {
     WiFiClientSecure client;
     client.setInsecure();
   #else
+    yield();
+    ESP.wdtFeed();
+    delay(10);
     BearSSL::WiFiClientSecure client;
     client.setInsecure();
-    client.setBufferSizes(512, 512);
+    client.setBufferSizes(1536, 1536);
   #endif
 
   HTTPClient http;
