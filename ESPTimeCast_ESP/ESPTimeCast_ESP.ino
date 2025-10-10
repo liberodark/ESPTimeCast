@@ -120,6 +120,10 @@ bool isAPMode = false;
 char tempSymbol = '[';
 bool shouldFetchWeatherNow = false;
 
+// Weather fetching timing
+unsigned long lastFetch = 0;
+const unsigned long fetchInterval = 300000;  // 5 minutes
+
 unsigned long lastSwitch = 0;
 unsigned long lastColonBlink = 0;
 int displayMode = 0;  // 0: Clock, 1: Weather, 2: Weather Description, 3: Countdown
@@ -1709,6 +1713,214 @@ void setupWebServer() {
     request->send(200, "application/json", json);
   });
 
+
+  // Get full system information
+  server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    DynamicJsonDocument doc(2048);
+
+    // System info
+    doc["system"]["uptime"] = millis() / 1000;
+    doc["system"]["freeHeap"] = ESP.getFreeHeap();
+    doc["system"]["rssi"] = WiFi.RSSI();
+    doc["system"]["ip"] = WiFi.localIP().toString();
+    doc["system"]["mac"] = WiFi.macAddress();
+
+    // Display info
+    doc["display"]["mode"] = displayMode;
+    doc["display"]["brightness"] = brightness;
+    doc["display"]["off"] = displayOff;
+    doc["display"]["flipped"] = flipDisplay;
+
+    // Config
+    doc["config"]["clockDuration"] = clockDuration;
+    doc["config"]["weatherDuration"] = weatherDuration;
+    doc["config"]["twelveHour"] = twelveHourToggle;
+    doc["config"]["showDayOfWeek"] = showDayOfWeek;
+    doc["config"]["showDate"] = showDate;
+    doc["config"]["showHumidity"] = showHumidity;
+    doc["config"]["language"] = language;
+
+    // Time
+    time_t now = time(nullptr);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    doc["time"]["unix"] = now;
+    char timeFormatted[6];
+    sprintf(timeFormatted, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    doc["time"]["formatted"] = timeFormatted;
+
+    // Weather
+    doc["weather"]["temp"] = currentTemp;
+    doc["weather"]["humidity"] = currentHumidity;
+    doc["weather"]["description"] = weatherDescription;
+    doc["weather"]["lastFetch"] = weatherFetchInitiated ? (millis() - lastFetch) / 1000 : -1;
+
+    // Countdown
+    if (countdownEnabled) {
+      doc["countdown"]["enabled"] = true;
+      doc["countdown"]["target"] = countdownTargetTimestamp;
+      doc["countdown"]["remaining"] = max(0L, (long)(countdownTargetTimestamp - now));
+      doc["countdown"]["label"] = countdownLabel;
+    }
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Control display mode
+  server.on("/api/mode", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    if (!request->hasParam("mode", true)) {
+      request->send(400, "application/json", "{\"error\":\"Missing mode parameter\"}");
+      return;
+    }
+
+    int newMode = request->getParam("mode", true)->value().toInt();
+    String response;
+
+    if (newMode >= 0 && newMode <= 6) {
+      displayMode = newMode;
+      lastSwitch = millis();
+      response = "{\"status\":\"ok\",\"mode\":" + String(newMode) + "}";
+      request->send(200, "application/json", response);
+    } else {
+      request->send(400, "application/json", "{\"error\":\"Invalid mode\"}");
+    }
+  });
+
+  // Control brightness
+  server.on("/api/brightness", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    if (!request->hasParam("value", true)) {
+      request->send(400, "application/json", "{\"error\":\"Missing value parameter\"}");
+      return;
+    }
+
+    int newBrightness = request->getParam("value", true)->value().toInt();
+
+    if (newBrightness >= -1 && newBrightness <= 15) {
+      brightness = newBrightness;
+
+      if (brightness == -1) {
+        P.displayShutdown(true);
+        displayOff = true;
+      } else {
+        if (displayOff) {
+          P.displayShutdown(false);
+          displayOff = false;
+        }
+        P.setIntensity(brightness);
+      }
+
+      String response = "{\"status\":\"ok\",\"brightness\":" + String(brightness) + "}";
+      request->send(200, "application/json", response);
+    } else {
+      request->send(400, "application/json", "{\"error\":\"Invalid brightness value\"}");
+    }
+  });
+
+  // Refresh weather
+  server.on("/api/weather/refresh", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    shouldFetchWeatherNow = true;
+    request->send(200, "application/json", "{\"status\":\"Weather refresh triggered\"}");
+  });
+
+  // Get weather data
+  server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    DynamicJsonDocument doc(512);
+    doc["temp"] = currentTemp;
+    doc["humidity"] = currentHumidity;
+    doc["description"] = weatherDescription;
+    doc["available"] = weatherAvailable;
+    doc["provider"] = weatherProvider == PROVIDER_OPEN_METEO ? "openmeteo" :
+                      weatherProvider == PROVIDER_OPEN_WEATHER ? "openweather" : "pirateweather";
+    doc["units"] = weatherUnits;
+    doc["location"]["lat"] = openMeteoLatitude;
+    doc["location"]["lon"] = openMeteoLongitude;
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Control countdown
+  server.on("/api/countdown", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    DynamicJsonDocument response(256);
+    bool changed = false;
+
+    if (request->hasParam("enabled", true)) {
+      countdownEnabled = (request->getParam("enabled", true)->value() == "true" ||
+                         request->getParam("enabled", true)->value() == "1");
+      changed = true;
+    }
+
+    if (request->hasParam("timestamp", true)) {
+      countdownTargetTimestamp = request->getParam("timestamp", true)->value().toInt();
+      changed = true;
+    }
+
+    if (request->hasParam("label", true)) {
+      String label = request->getParam("label", true)->value();
+      strlcpy(countdownLabel, label.c_str(), sizeof(countdownLabel));
+      changed = true;
+    }
+
+    if (changed) {
+      saveCountdownConfig(countdownEnabled, countdownTargetTimestamp, countdownLabel);
+      response["status"] = "ok";
+      response["countdown"]["enabled"] = countdownEnabled;
+      response["countdown"]["target"] = countdownTargetTimestamp;
+      response["countdown"]["label"] = countdownLabel;
+    } else {
+      response["status"] = "No changes";
+    }
+
+    String json;
+    serializeJson(response, json);
+    request->send(200, "application/json", json);
+  });
+
+  // Reboot device
+  server.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!apiEnabled) {
+      request->send(403, "application/json", "{\"error\":\"API disabled\"}");
+      return;
+    }
+
+    request->send(200, "application/json", "{\"status\":\"Rebooting...\"}");
+    delay(1000);
+    ESP.restart();
+  });
+
   server.on("/set_api", HTTP_POST, [](AsyncWebServerRequest *request) {
     bool enableApi = false;
     if (request->hasParam("value", true)) {
@@ -2416,7 +2628,7 @@ DisplayMode key:
   4: Nightscout
   5: Date
   6: YouTube
-  10: Custom Message (API)
+  10: API
   11: Webhook
 */
 
@@ -2675,11 +2887,6 @@ void loop() {
   static int ntpAnimFrame = 0;
   static bool tzSetAfterSync = false;
 
-  static unsigned long lastFetch = 0;
-  const unsigned long fetchInterval = 300000;  // 5 minutes
-
-
-
   // AP Mode animation
   static unsigned long apAnimTimer = 0;
   static int apAnimFrame = 0;
@@ -2802,7 +3009,6 @@ void loop() {
     yield();
   }
 
-
   // --- IP Display ---
   if (showingIp) {
     if (P.displayAnimate()) {
@@ -2822,7 +3028,6 @@ void loop() {
     return;  // Exit loop early if showing IP
   }
 
-
   // --- BRIGHTNESS/OFF CHECK ---
   if (brightness == -1) {
     if (!displayOff) {
@@ -2833,7 +3038,6 @@ void loop() {
     }
     yield();
   }
-
 
   // --- NTP State Machine ---
   switch (ntpState) {
@@ -2899,14 +3103,11 @@ void loop() {
       break;
   }
 
-
   // Only advance mode by timer for clock/weather, not description!
   unsigned long displayDuration = (displayMode == 0) ? clockDuration : weatherDuration;
   if ((displayMode == 0 || displayMode == 1) && millis() - lastSwitch > displayDuration) {
     advanceDisplayMode();
   }
-
-
 
   // --- MODIFIED WEATHER FETCHING LOGIC ---
   if (WiFi.status() == WL_CONNECTED) {
@@ -3102,7 +3303,6 @@ void loop() {
   // --- update prevDisplayMode ---
   prevDisplayMode = displayMode;
 
-
   // --- WEATHER Display Mode ---
   static bool weatherWasAvailable = false;
   if (displayMode == 1) {
@@ -3136,7 +3336,6 @@ void loop() {
     yield();
     return;
   }
-
 
   // --- WEATHER DESCRIPTION Display Mode ---
   if (displayMode == 2 && showWeatherDescription && weatherAvailable && weatherDescription.length() > 0) {
@@ -3183,7 +3382,6 @@ void loop() {
       return;
     }
   }
-
 
   // --- Countdown Display Mode ---
   if (displayMode == 3 && countdownEnabled && ntpSyncSuccessful) {
@@ -3472,7 +3670,6 @@ void loop() {
     yield();
     return;
   }  // End of if (displayMode == 3 && ...)
-
 
   // --- NIGHTSCOUT Display Mode ---
   if (displayMode == 4) {

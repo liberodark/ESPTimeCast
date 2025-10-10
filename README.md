@@ -259,6 +259,64 @@ The following table summarizes what will appear on the display in each scenario:
 - In **Weather** mode, if weather is available, you’ll see the temperature (like `23ºC`). If weather is not available but time is, it falls back to showing the clock. If neither is available, you’ll see `! TEMP`.
 - All status/error messages (`! NTP`, `! TEMP`) are big icons shown on the display.
 
+## API
+
+### System
+
+| Endpoint | Method | Description | Parameters |
+|----------|--------|-------------|------------|
+| `/api/info` | GET | Get complete system information | None |
+| `/api/status` | GET | Get basic device status (legacy) | None |
+| `/api/reboot` | POST | Restart the device | None |
+| `/api/mode` | POST | Change display mode | `mode` (0-6): Display mode |
+| `/api/brightness` | POST | Set display brightness | `value` (-1 to 15): Brightness level |
+| `/api/message` | POST | Show custom message | `text` (required): Message text<br>`duration` (optional): Seconds to display<br>`scroll` (optional): 1=scroll, 0=static<br>`priority` (optional): 0-2 priority level |
+| `/api/weather` | GET | Get current weather data | None |
+| `/api/weather/refresh` | POST | Force weather data refresh | None |
+| `/api/countdown` | POST | Control countdown timer | `enabled` (optional): true/false<br>`timestamp` (optional): Unix timestamp<br>`label` (optional): Countdown label |
+
+**Display Modes:**
+- `0` - Clock
+- `1` - Weather
+- `2` - Weather Description
+- `3` - Countdown
+- `4` - Nightscout
+- `5` - Date
+- `6` - YouTube Subscribers
+
+---
+
+### Example :
+
+```bash
+# Get system info
+curl http://192.168.1.100/api/info
+
+# Switch to weather display
+curl -X POST http://192.168.1.100/api/mode -d "mode=1"
+
+# Set brightness to 5
+curl -X POST http://192.168.1.100/api/brightness -d "value=5"
+
+# Show custom message
+curl -X POST http://192.168.1.100/api/message \
+  -d "text=HELLO WORLD" \
+  -d "duration=10" \
+  -d "scroll=1"
+
+# Refresh weather
+curl -X POST http://192.168.1.100/api/weather/refresh
+
+# Start countdown to New Year
+curl -X POST http://192.168.1.100/api/countdown \
+  -d "enabled=true" \
+  -d "timestamp=1735689600" \
+  -d "label=NEW YEAR"
+
+# Reboot device
+curl -X POST http://192.168.1.100/api/reboot
+```
+
 ## Webhooks
 
 ESPTimeCast supports incoming webhooks for displaying notifications from external services.
@@ -323,47 +381,3 @@ If you enjoy this project, please consider supporting my work:
 
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?logo=paypal)](https://www.paypal.me/officialuphoto)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-fafbfc?logo=github&logoColor=ea4aaa)](https://github.com/sponsors/mfactory-osaka)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
