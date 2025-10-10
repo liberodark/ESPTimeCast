@@ -230,11 +230,6 @@ window.onload = function () {
                 document.getElementById('webhookSettings').style.display = 'block';
             }
 
-            // Update webhook URL with actual IP
-            if (!isAPMode && window.location.hostname) {
-                document.getElementById('webhookUrl').textContent =
-                    `http://${window.location.hostname}/webhook`;
-            }
             // YT
             document.getElementById('youtubeEnabled').checked = !!(data.youtube && data.youtube.enabled);
             document.getElementById('youtubeApiKey').value = (data.youtube && data.youtube.apiKey) || '';
@@ -860,41 +855,6 @@ function setWebhooks(val) {
     });
 
     document.getElementById('webhookSettings').style.display = val ? 'block' : 'none';
-}
-
-function testWebhook() {
-    const key = document.getElementById('webhookKey').value;
-    if (!key) {
-        alert('⚠️ Please set a webhook key first!');
-        return;
-    }
-
-    // Show loading
-    const btn = event.target;
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Testing...';
-
-    fetch('/webhook', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `key=${encodeURIComponent(key)}&message=TEST OK&duration=3&priority=2`
-    })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'queued') {
-                alert('✅ Webhook test successful!\nLook at your display!');
-            } else {
-                alert('❌ Error: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(e => {
-            alert('❌ Connection failed: ' + e.message);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = originalText;
-        });
 }
 
 // --- YouTube Controls Logic ---

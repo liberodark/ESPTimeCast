@@ -1838,24 +1838,6 @@ void setupWebServer() {
     request->send(200, "application/json", json);
   });
 
-  // Test endpoint
-  server.on("/webhook/test", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!webhooksEnabled) {
-      request->send(403, "application/json", "{\"error\":\"Webhooks disabled\"}");
-      return;
-    }
-
-    DynamicJsonDocument response(256);
-    response["enabled"] = webhooksEnabled;
-    response["requires_key"] = strlen(webhookKey) > 0;
-    response["queue_size"] = messageQueue.size();
-    response["quiet_hours"] = webhookQuietHours && dimmingEnabled;
-
-    String json;
-    serializeJson(response, json);
-    request->send(200, "application/json", json);
-  });
-
   // Live toggle
   server.on("/set_webhooks", HTTP_POST, [](AsyncWebServerRequest *request) {
     bool enable = false;
