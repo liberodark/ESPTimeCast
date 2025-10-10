@@ -3494,6 +3494,7 @@ void loop() {
         https.setConnectTimeout(5000);
         https.setTimeout(5000);
       #else  // ESP8266
+        client.setBufferSizes(512, 512);
         https.setTimeout(5000);  // Sets both connection and response timeout
       #endif
 
