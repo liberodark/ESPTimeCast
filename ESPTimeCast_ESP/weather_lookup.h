@@ -10,7 +10,9 @@ typedef struct {
     const char* lang;
     struct {
         const char* clear;
+        const char* mostly_clear;
         const char* partly_cloudy;
+        const char* mostly_cloudy;
         const char* cloudy;
         const char* overcast;
         const char* fog;
@@ -115,37 +117,37 @@ inline const char* getWeatherByCode(int code, const char* lang) {
 
 const WeatherTermsMapping weather_terms[] = {
     { "fr", {
-        "CLAIR", "PARTIELLEMENT NUAGEUX", "NUAGEUX", "COUVERT", "BROUILLARD",
+        "CLAIR", "PLUTOT CLAIR", "PARTIELLEMENT NUAGEUX", "PARTIELLEMENT NUAGEUX", "NUAGEUX", "COUVERT", "BROUILLARD",
         "BRUINE", "PLUIE", "FORTE PLUIE", "NEIGE", "AVERSES", "AVERSES DE NEIGE",
         "ORAGE", "GRELE", "BRUME", "LEGERE", "MODEREE", "FORTE",
-        "NUAGES FRAGMENTES", "NUAGES EPARS", "PEU NUAGEUX"
+        "NUAGES CLAIRSEMES", "NUAGES EPARS", "PEU NUAGEUX"
     }},
     { "es", {
-        "DESPEJADO", "PARCIALMENTE NUBLADO", "NUBLADO", "CUBIERTO", "NIEBLA",
+        "DESPEJADO", "MAYORMENTE DESPEJADO", "PARCIALMENTE NUBLADO", "PARCIALMENTE NUBLADO", "NUBLADO", "CUBIERTO", "NIEBLA",
         "LLOVIZNA", "LLUVIA", "LLUVIA INTENSA", "NIEVE", "CHUBASCOS", "CHUBASCOS DE NIEVE",
         "TORMENTA", "GRANIZO", "NEBLINA", "LIGERA", "MODERADA", "INTENSA",
         "NUBES ROTAS", "NUBES DISPERSAS", "POCAS NUBES"
     }},
     { "de", {
-        "KLAR", "TEILWEISE BEWOLKT", "WOLKIG", "BEDECKT", "NEBEL",
+        "KLAR", "ÜBERWIEGEND KLAR", "TEILWEISE BEWOLKT", "TEILWEISE BEWOLKT", "WOLKIG", "BEDECKT", "NEBEL",
         "NIESELREGEN", "REGEN", "STARKREGEN", "SCHNEE", "SCHAUER", "SCHNEESCHAUER",
         "GEWITTER", "HAGEL", "DUNST", "LEICHT", "MAESSIG", "STARK",
         "AUFGELOCKERTE WOLKEN", "VEREINZELTE WOLKEN", "WENIGE WOLKEN"
     }},
     { "it", {
-        "SERENO", "PARZIALMENTE NUVOLOSO", "NUVOLOSO", "COPERTO", "NEBBIA",
+        "SERENO", "PREVALENTEMENTE SERENO", "PARZIALMENTE NUVOLOSO", "PARZIALMENTE NUVOLOSO", "NUVOLOSO", "COPERTO", "NEBBIA",
         "PIOVIGGINE", "PIOGGIA", "PIOGGIA FORTE", "NEVE", "ROVESCI", "ROVESCI DI NEVE",
         "TEMPORALE", "GRANDINE", "FOSCHIA", "LEGGERA", "MODERATA", "FORTE",
         "NUBI IRREGOLARI", "NUBI SPARSE", "POCHE NUVOLE"
     }},
     { "pt", {
-        "LIMPO", "PARCIALMENTE NUBLADO", "NUBLADO", "ENCOBERTO", "NEVOEIRO",
+        "LIMPO", "MAIORMENTE LIMPO", "PARCIALMENTE NUBLADO", "PARCIALMENTE NUBLADO", "NUBLADO", "ENCOBERTO", "NEVOEIRO",
         "CHUVISCO", "CHUVA", "CHUVA FORTE", "NEVE", "PANCADAS", "PANCADAS DE NEVE",
         "TROVOADA", "GRANIZO", "NEVOA", "LEVE", "MODERADA", "FORTE",
         "NUVENS QUEBRADAS", "NUVENS DISPERSAS", "POUCAS NUVENS"
     }},
     { "nl", {
-        "HELDER", "GEDEELTELIJK BEWOLKT", "BEWOLKT", "OVERTROKKEN", "MIST",
+        "HELDER", "OVERWEGEND HELDER", "GEDEELTELIJK BEWOLKT", "GEDEELTELIJK BEWOLKT", "BEWOLKT", "OVERTROKKEN", "MIST",
         "MOTREGEN", "REGEN", "ZWARE REGEN", "SNEEUW", "BUIEN", "SNEEUWBUIEN",
         "ONWEER", "HAGEL", "NEVEL", "LICHT", "MATIG", "ZWAAR",
         "ONDERBROKEN BEWOLKING", "VERSPREIDE BEWOLKING", "WEINIG BEWOLKING"
@@ -161,7 +163,9 @@ inline void translateAPIWeatherTerms(String& desc, const char* lang) {
         if (strcmp(lang, weather_terms[i].lang) == 0) {
             const WeatherTermsMapping& translation = weather_terms[i];
 
+            desc.replace("MOSTLY CLEAR", translation.terms.mostly_clear);
             desc.replace("CLEAR", translation.terms.clear);
+            desc.replace("MOSTLY CLOUDY", translation.terms.mostly_cloudy);
             desc.replace("PARTLY CLOUDY", translation.terms.partly_cloudy);
             desc.replace("CLOUDY", translation.terms.cloudy);
             desc.replace("OVERCAST", translation.terms.overcast);
