@@ -217,6 +217,8 @@ window.onload = function () {
             document.getElementById('showHumidity').checked = !!data.showHumidity;
             document.getElementById('colonBlinkEnabled').checked = !!data.colonBlinkEnabled;
             document.getElementById('showWeatherDescription').checked = !!data.showWeatherDescription;
+            document.getElementById('mdnsEnabled').checked = data.mdnsEnabled !== false;
+            document.getElementById('mdnsHostname').value = data.mdnsHostname || 'esptimecast';
             document.getElementById('apiEnabled').checked = !!data.apiEnabled;
             // Webhooks
             document.getElementById('webhooksEnabled').checked = !!data.webhooksEnabled;
@@ -419,6 +421,10 @@ async function submitConfig(event) {
     formData.set('dimBrightness', document.getElementById('dimBrightness').value);
     formData.set('showWeatherDescription', document.getElementById('showWeatherDescription').checked ? 'on' : '');
     formData.set('weatherUnits', document.getElementById('weatherUnits').checked ? 'imperial' : 'metric');
+    // mDNS
+    formData.set('mdnsEnabled', document.getElementById('mdnsEnabled').checked ? 'true' : 'false');
+    formData.set('mdnsHostname', document.getElementById('mdnsHostname').value || 'esptimecast');
+    // API
     formData.set('apiEnabled', document.getElementById('apiEnabled').checked ? 'on' : '');
 
     // --- NEW: Countdown Form Data ---

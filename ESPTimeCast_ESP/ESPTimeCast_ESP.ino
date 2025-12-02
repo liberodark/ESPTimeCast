@@ -3,10 +3,12 @@
   #include <WiFi.h>
   #include <HTTPClient.h>
   #include <AsyncTCP.h>
+  #include <ESPmDNS.h>
 #else  // ESP8266
   #include <ESP8266WiFi.h>
   #include <ESP8266HTTPClient.h>
   #include <ESPAsyncTCP.h>
+  #include <ESP8266mDNS.h>
 #endif
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -89,7 +91,7 @@ int dimEndHour = 8;  // 8am default
 int dimEndMinute = 0;
 int dimBrightness = 2;  // Dimming level (0-15)
 
-//Countdown Globals - NEW
+// Countdown Globals - NEW
 bool countdownEnabled = false;
 time_t countdownTargetTimestamp = 0;  // Unix timestamp
 char countdownLabel[64] = "";         // Label for the countdown
@@ -156,7 +158,11 @@ bool countdownScrolling = false;
 unsigned long countdownScrollEndTime = 0;
 unsigned long countdownStaticStartTime = 0;  // For last-day static display
 
-// === API Message System ===
+// mDNS
+bool mdnsEnabled = true;
+char mdnsHostname[32] = "esptimecast";
+
+// API
 bool apiEnabled = false;
 String customMessage = "";
 bool showCustomMessage = false;
@@ -174,7 +180,7 @@ String currentSubscriberCount = "";
 unsigned long lastYoutubeFetch = 0;
 const unsigned long youtubeFetchInterval = 1800000; // 30 minutes
 
-// === Webhook System ===
+// Webhook
 bool webhooksEnabled = false;
 char webhookKey[32] = "";
 int webhookQueueSize = 5;
@@ -673,6 +679,8 @@ void loadConfig() {
   showHumidity = doc["showHumidity"] | false;
   colonBlinkEnabled = doc.containsKey("colonBlinkEnabled") ? doc["colonBlinkEnabled"].as<bool>() : true;
   showWeatherDescription = doc["showWeatherDescription"] | false;
+  mdnsEnabled = doc["mdnsEnabled"] | true;
+  strlcpy(mdnsHostname, doc["mdnsHostname"] | "esptimecast", sizeof(mdnsHostname));
   apiEnabled = doc["apiEnabled"] | false;
   webhooksEnabled = doc["webhooksEnabled"] | false;
   strlcpy(webhookKey, doc["webhookKey"] | "", sizeof(webhookKey));
@@ -952,6 +960,22 @@ void setupTime() {
     ntpSyncSuccessful = false;
     ntpState = NTP_SYNCING;   // instead of NTP_IDLE
     ntpStartTime = millis();  // start the failed timer (so retry delay counts from now)
+  }
+}
+
+// -----------------------------------------------------------------------------
+// mDNS
+// -----------------------------------------------------------------------------
+void setupMDNS() {
+  if (!mdnsEnabled) {
+    Serial.println(F("[MDNS] Disabled by config"));
+    return;
+  }
+  if (MDNS.begin(mdnsHostname)) {
+    Serial.printf("[MDNS] Started: http://%s.local\n", mdnsHostname);
+    MDNS.addService("http", "tcp", 80);
+  } else {
+    Serial.println(F("[MDNS] Failed to start"));
   }
 }
 
@@ -2675,6 +2699,7 @@ void setup() {
 
   setupWebServer();
   Serial.println(F("[SETUP] Webserver setup complete"));
+  setupMDNS();
   Serial.println(F("[SETUP] Setup complete"));
   Serial.println();
   printConfigToSerial();
@@ -2875,6 +2900,12 @@ void loop() {
   if (isAPMode) {
     dnsServer.processNextRequest();
   }
+
+  #ifdef ESP8266
+    if (mdnsEnabled) {
+      MDNS.update();
+    }
+  #endif
 
   static bool colonVisible = true;
   const unsigned long colonBlinkInterval = 800;

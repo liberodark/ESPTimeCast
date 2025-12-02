@@ -207,6 +207,23 @@
     </button>
     <div class="collapsible-content" aria-hidden="true">
 
+  <label style="display: flex; align-items: center; margin-top: 1.75rem; justify-content: space-between;">
+    <span style="margin-right: 0.5em;">Enable mDNS:</span>
+    <span class="toggle-switch">
+      <input type="checkbox" id="mdnsEnabled" name="mdnsEnabled">
+      <span class="toggle-slider"></span>
+    </span>
+  </label>
+
+  <div id="mdnsSettings" style="margin-top: 0.5rem;">
+    <label>Hostname:</label>
+    <div style="display: flex; align-items: center;">
+      <input type="text" id="mdnsHostname" name="mdnsHostname" placeholder="esptimecast" maxlength="31" style="flex: 1;" pattern="^[a-z0-9][a-z0-9\-]{0,30}$" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9\-]/g, '')">
+      <span style="margin-left: 0.5rem;">.local</span>
+    </div>
+    <div class="small">Access via http://[hostname].local</div>
+  </div>
+
   <!-- Security Section -->
   <h3 style="margin-top: 2rem;">🔐 Security</h3>
 
