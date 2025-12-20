@@ -41,6 +41,12 @@
   #define CS_PIN 13   // D7
 #endif
 
+#ifdef ESP8266
+WiFiEventHandler wifiConnectHandler;
+WiFiEventHandler wifiDisconnectHandler;
+WiFiEventHandler wifiGotIPHandler;
+#endif
+
 MD_Parola P = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 AsyncWebServer server(80);
 
@@ -66,6 +72,8 @@ char openMeteoLongitude[64] = "";
 char weatherUnits[12] = "metric";
 char timeZone[64] = "";
 char language[8] = "en";
+unsigned long lastWifiConnectTime = 0;
+const unsigned long WIFI_STABILIZE_DELAY = 5000;
 
 // Timing and display settings
 unsigned long clockDuration = 10000;
@@ -2263,6 +2271,11 @@ String getWeatherDescription(int code, const char* lang) {
 }
 
 void fetchOpenWeather() {
+  if (millis() - lastWifiConnectTime < WIFI_STABILIZE_DELAY) {
+    Serial.println(F("[WEATHER] Skipped: WiFi stabilizing..."));
+    return;
+  }
+
   Serial.println(F("[WEATHER] Fetching weather data from OpenWeatherMap..."));
 
   if (strlen(weatherApiKey) == 0) {
@@ -2356,6 +2369,11 @@ void fetchOpenWeather() {
 }
 
 void fetchPirateWeather() {
+  if (millis() - lastWifiConnectTime < WIFI_STABILIZE_DELAY) {
+    Serial.println(F("[WEATHER] Skipped: WiFi stabilizing..."));
+    return;
+  }
+
   Serial.println(F("[WEATHER] Fetching from PirateWeather..."));
 
   if (strlen(weatherApiKey) == 0) {
@@ -2441,6 +2459,11 @@ void fetchPirateWeather() {
 }
 
 void fetchOpenMeteo() {
+  if (millis() - lastWifiConnectTime < WIFI_STABILIZE_DELAY) {
+    Serial.println(F("[WEATHER] Skipped: WiFi stabilizing..."));
+    return;
+  }
+
   Serial.println(F("[WEATHER] Fetching weather data from Open-Meteo..."));
 
   float lat = atof(openMeteoLatitude);
@@ -2594,6 +2617,11 @@ void fetchYoutubeSubscribers() {
     return;
   }
 
+  if (millis() - lastWifiConnectTime < WIFI_STABILIZE_DELAY) {
+    Serial.println(F("[YouTube] Skipped: WiFi stabilizing..."));
+    return;
+  }
+
   Serial.println(F("[YouTube] Fetching subscriber count..."));
 
   String url = "https://www.googleapis.com/youtube/v3/channels?";
@@ -2688,6 +2716,31 @@ void setup() {
   Serial.println(F("[SETUP] Parola (LED Matrix) initialized"));
 
   connectWiFi();
+
+  #if defined(ESP32)
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(false);
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+      if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+        Serial.println(F("[WIFI] Got IP"));
+        lastWifiConnectTime = millis();
+      } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+        Serial.println(F("[WIFI] Disconnected"));
+      }
+    });
+
+  #elif defined(ESP8266)
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(false);
+    wifiGotIPHandler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &ev) {
+      Serial.println(F("[WIFI] Got IP"));
+      lastWifiConnectTime = millis();
+    });
+    wifiDisconnectHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &ev) {
+      Serial.printf("[WIFI] Disconnected (reason: %d)\n", ev.reason);
+    });
+  #endif
 
   if (isAPMode) {
     Serial.println(F("[SETUP] WiFi connection failed. Device is in AP Mode."));
