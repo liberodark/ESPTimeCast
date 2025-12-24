@@ -5,6 +5,8 @@
   "adminPassword": "",
   "totpEnabled": false,
   "totpSecret": "",
+  "mdnsEnabled": true,
+  "mdnsHostname": "esptimecast",
   "openMeteoLatitude": "",
   "openMeteoLongitude": "",
   "weatherProvider": "openmeteo",

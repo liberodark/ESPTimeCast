@@ -1194,6 +1194,12 @@ void setupWebServer() {
       else if (n == "showWeatherDescription") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "dimmingEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
       else if (n == "weatherUnits") doc[n] = v;
+      else if (n == "mdnsEnabled") doc[n] = (v == "true" || v == "on" || v == "1");
+      else if (n == "mdnsHostname") {
+        if (v.length() > 0 && v.length() < 32) {
+          doc[n] = v;
+        }
+      }
       else if (n == "weatherProvider") doc[n] = v;
       else if (n == "weatherApiKey") {
       if (v != "********" && v.length() > 0) {
