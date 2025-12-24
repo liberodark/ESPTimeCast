@@ -2389,7 +2389,7 @@ void fetchPirateWeather() {
   float lat = atof(openMeteoLatitude);
   float lon = atof(openMeteoLongitude);
 
-  String url = "https://api.pirateweather.net/forecast/";
+  String url = "http://api.pirateweather.net/forecast/";
   url += String(weatherApiKey) + "/";
   url += String(lat, 6) + "," + String(lon, 6);
   url += "?units=" + String(strcmp(weatherUnits, "imperial") == 0 ? "us" : "si");
@@ -2398,17 +2398,7 @@ void fetchPirateWeather() {
   Serial.print(F("[WEATHER] URL: "));
   Serial.println(url);
 
-  #ifdef ESP32
-    WiFiClientSecure client;
-    client.setInsecure();
-  #else
-    yield();
-    ESP.wdtFeed();
-    delay(10);
-    BearSSL::WiFiClientSecure client;
-    client.setInsecure();
-    client.setBufferSizes(1536, 1536);
-  #endif
+  WiFiClient client;
 
   HTTPClient http;
   http.begin(client, url);
@@ -2416,11 +2406,6 @@ void fetchPirateWeather() {
   http.setReuse(false);
 
   int httpCode = http.GET();
-
-  auto cleanup = [&]() {
-    http.end();
-    client.stop();
-  };
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -2433,7 +2418,7 @@ void fetchPirateWeather() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      cleanup();
+      http.end();
       return;
     }
 
@@ -2463,7 +2448,7 @@ void fetchPirateWeather() {
     weatherAvailable = false;
   }
 
-  cleanup();
+  http.end();
 }
 
 void fetchOpenMeteo() {
