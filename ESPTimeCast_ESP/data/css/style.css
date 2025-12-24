@@ -195,6 +195,17 @@ select option {
     box-shadow: none;
 }
 
+.toggle-label {
+    display: flex;
+    align-items: center;
+    margin-top: 1.75rem;
+    justify-content: space-between;
+}
+
+.toggle-label span:first-child {
+    margin-right: 0.5em;
+}
+
 .toggle-switch {
     position: relative;
     display: inline-block;

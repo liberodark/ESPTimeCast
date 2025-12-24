@@ -1,90 +1,107 @@
 let isSaving = false;
 let isAPMode = false;
 
-// Set initial value display for brightness
-document.addEventListener('DOMContentLoaded', function() {
-    brightnessValue.textContent = brightnessSlider.value;
-});
+// Helpers
+function setupPasswordToggle(inputId, toggleId, showPlaceholder, hidePlaceholder = '') {
+    const input = document.getElementById(inputId);
+    const toggle = document.getElementById(toggleId);
+    if (!input || !toggle) return;
 
-function toggleWeatherApiKey(provider) {
-  const apiKeySection = document.getElementById('weatherApiKeySection');
-  apiKeySection.style.display = (provider === 'openweather' || provider === 'pirateweather') ? 'block' : 'none';
-}
-
-// Show/Hide Password toggle
-document.addEventListener("DOMContentLoaded", function () {
-    const passwordInput = document.getElementById("password");
-    const toggleCheckbox = document.getElementById("togglePassword");
-
-    toggleCheckbox.addEventListener("change", function () {
+    toggle.addEventListener('change', function () {
         if (this.checked) {
-            // Show password as text
-            passwordInput.type = "text";
-
-            // Only clear if it's the masked placeholder
-            if (passwordInput.value === "********") {
-                passwordInput.value = "";
-                passwordInput.placeholder = "Enter new password";
+            input.type = 'text';
+            if (input.value === '********') {
+                input.value = '';
+                input.placeholder = showPlaceholder;
             }
         } else {
-            // Hide password as dots
-            passwordInput.type = "password";
-
-            // Remove placeholder only if it was set by show-password toggle
-            if (passwordInput.placeholder === "Enter new password") {
-                passwordInput.placeholder = "";
+            input.type = 'password';
+            if (input.placeholder === showPlaceholder && hidePlaceholder) {
+                input.placeholder = hidePlaceholder;
             }
         }
     });
-});
+}
 
-// Show/Hide Weather API Key toggle
-document.addEventListener("DOMContentLoaded", function () {
-  const weatherApiKeyInput = document.getElementById("weatherApiKey");
-  const toggleWeatherApiKeyCheckbox = document.getElementById("toggleWeatherApiKey");
-
-  if (toggleWeatherApiKeyCheckbox && weatherApiKeyInput) {
-    toggleWeatherApiKeyCheckbox.addEventListener("change", function () {
-      if (this.checked) {
-        weatherApiKeyInput.type = "text";
-        if (weatherApiKeyInput.value === "********") {
-          weatherApiKeyInput.value = "";
-          weatherApiKeyInput.placeholder = "Enter new API key";
-        }
-      } else {
-        weatherApiKeyInput.type = "password";
-        if (weatherApiKeyInput.placeholder === "Enter new API key") {
-          weatherApiKeyInput.placeholder = "Enter API key";
-        }
-      }
+function postBoolValue(endpoint, val) {
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'value=' + (val ? 1 : 0)
     });
-  }
-});
+}
 
-// Auth settings toggle
-document.getElementById('authEnabled').addEventListener('change', function() {
-    document.getElementById('authSettings').style.display = this.checked ? 'block' : 'none';
-});
+function postEncodedValue(endpoint, val) {
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'value=' + encodeURIComponent(val)
+    });
+}
 
-document.getElementById('totpEnabled').addEventListener('change', function() {
-    document.getElementById('totpSetup').style.display = this.checked ? 'block' : 'none';
-});
+function loadCheckboxes(data, fields) {
+    fields.forEach(field => {
+        const el = document.getElementById(field);
+        if (el) el.checked = !!data[field];
+    });
+}
 
-document.getElementById('toggleAdminPassword').addEventListener('change', function() {
-    const passwordInput = document.getElementById('adminPassword');
-    passwordInput.type = this.checked ? 'text' : 'password';
+function appendCheckboxesToFormData(formData, fields) {
+    fields.forEach(field => {
+        const el = document.getElementById(field);
+        if (el) formData.set(field, el.checked ? 'on' : '');
+    });
+}
 
-    if (this.checked && passwordInput.value === '********') {
-        passwordInput.value = '';
-        passwordInput.placeholder = 'Enter new password';
+function appendBoolCheckboxesToFormData(formData, fields) {
+    fields.forEach(field => {
+        const el = document.getElementById(field);
+        if (el) formData.set(field, el.checked ? 'true' : 'false');
+    });
+}
+
+function toggleWeatherApiKey(provider) {
+    const apiKeySection = document.getElementById('weatherApiKeySection');
+    apiKeySection.style.display = (provider === 'openweather' || provider === 'pirateweather') ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Set initial value display for brightness
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const brightnessValue = document.getElementById('brightnessValue');
+    if (brightnessSlider && brightnessValue) {
+        brightnessValue.textContent = brightnessSlider.value;
+    }
+
+    // Show/Hide Password toggles
+    setupPasswordToggle('password', 'togglePassword', 'Enter new password', '');
+    setupPasswordToggle('weatherApiKey', 'toggleWeatherApiKey', 'Enter new API key', 'Enter API key');
+    setupPasswordToggle('adminPassword', 'toggleAdminPassword', 'Enter new password', '');
+    setupPasswordToggle('webhookKey', 'toggleWebhookKey', 'Enter new secret key', 'Enter secret key');
+    setupPasswordToggle('youtubeApiKey', 'toggleYoutubeApiKey', 'Enter new API key', 'AIza...');
+
+    // Auth settings toggle
+    const authEnabled = document.getElementById('authEnabled');
+    if (authEnabled) {
+        authEnabled.addEventListener('change', function () {
+            document.getElementById('authSettings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
+
+    const totpEnabled = document.getElementById('totpEnabled');
+    if (totpEnabled) {
+        totpEnabled.addEventListener('change', function () {
+            document.getElementById('totpSetup').style.display = this.checked ? 'block' : 'none';
+        });
     }
 });
 
+// TOTP
 async function setupTOTP() {
     try {
         await fetch('/auth/generate', {
             method: 'POST',
-            headers: {'X-Auth-Token': sessionStorage.getItem('token') || ''}
+            headers: { 'X-Auth-Token': sessionStorage.getItem('token') || '' }
         });
 
         const response = await fetch('/auth/qrcode');
@@ -109,58 +126,13 @@ async function setupTOTP() {
     }
 }
 
-// Show/Hide Webhook Key toggle
-document.addEventListener("DOMContentLoaded", function () {
-    const webhookKeyInput = document.getElementById("webhookKey");
-    const toggleWebhookCheckbox = document.getElementById("toggleWebhookKey");
-
-    if (toggleWebhookCheckbox && webhookKeyInput) {
-        toggleWebhookCheckbox.addEventListener("change", function () {
-            if (this.checked) {
-                webhookKeyInput.type = "text";
-                if (webhookKeyInput.value === "********") {
-                    webhookKeyInput.value = "";
-                    webhookKeyInput.placeholder = "Enter new secret key";
-                }
-            } else {
-                webhookKeyInput.type = "password";
-                if (webhookKeyInput.placeholder === "Enter new secret key") {
-                    webhookKeyInput.placeholder = "Enter secret key";
-                }
-            }
-        });
-    }
-});
-
-// Show/Hide YouTube API Key toggle
-document.addEventListener("DOMContentLoaded", function () {
-    const youtubeApiKeyInput = document.getElementById("youtubeApiKey");
-    const toggleYoutubeCheckbox = document.getElementById("toggleYoutubeApiKey");
-
-    if (toggleYoutubeCheckbox && youtubeApiKeyInput) {
-        toggleYoutubeCheckbox.addEventListener("change", function () {
-            if (this.checked) {
-                youtubeApiKeyInput.type = "text";
-                if (youtubeApiKeyInput.value === "********") {
-                    youtubeApiKeyInput.value = "";
-                    youtubeApiKeyInput.placeholder = "Enter new API key";
-                }
-            } else {
-                youtubeApiKeyInput.type = "password";
-                if (youtubeApiKeyInput.placeholder === "Enter new API key") {
-                    youtubeApiKeyInput.placeholder = "AIza...";
-                }
-            }
-        });
-    }
-});
-
 window.onbeforeunload = function () {
     if (isSaving) {
-        return "Settings are being saved. Leaving now may interrupt the process.";
+        return 'Settings are being saved. Leaving now may interrupt the process.';
     }
 };
 
+// Config loading
 window.onload = function () {
     fetch('/config.json', {
         headers: {
@@ -174,7 +146,6 @@ window.onload = function () {
                         return r.json();
                     } else {
                         window.location.href = '/login';
-                        return;
                     }
                 });
             }
@@ -186,7 +157,7 @@ window.onload = function () {
         .then(data => {
             if (!data) return;
 
-            isAPMode = (data.mode === "ap");
+            isAPMode = (data.mode === 'ap');
             if (isAPMode) {
                 document.querySelector('.geo-note').style.display = 'block';
                 document.getElementById('geo-button').classList.add('geo-disabled');
@@ -197,62 +168,55 @@ window.onload = function () {
             document.getElementById('password').value = data.password || '';
             document.getElementById('openMeteoLatitude').value = data.openMeteoLatitude || '';
             document.getElementById('openMeteoLongitude').value = data.openMeteoLongitude || '';
-            document.getElementById('weatherUnits').checked = (data.weatherUnits === "imperial");
+            document.getElementById('language').value = data.language || '';
+            document.getElementById('ntpServer1').value = data.ntpServer1 || '';
+            document.getElementById('ntpServer2').value = data.ntpServer2 || '';
+            document.getElementById('mdnsHostname').value = data.mdnsHostname || 'esptimecast';
+            document.getElementById('webhookKey').value = data.webhookKey || '';
+            document.getElementById('adminPassword').value = data.adminPassword || '';
+
+            document.getElementById('weatherUnits').checked = (data.weatherUnits === 'imperial');
             document.getElementById('clockDuration').value = (data.clockDuration || 10000) / 1000;
             document.getElementById('weatherDuration').value = (data.weatherDuration || 5000) / 1000;
-            document.getElementById('language').value = data.language || '';
-            // Weather provider
             document.getElementById('weatherProvider').value = data.weatherProvider || 'openmeteo';
             document.getElementById('weatherApiKey').value = data.weatherApiKey || '';
             toggleWeatherApiKey(data.weatherProvider || 'openmeteo');
-            // Advanced:
-            document.getElementById('brightnessSlider').value = typeof data.brightness !== "undefined" ? data.brightness : 10;
+
+            document.getElementById('brightnessSlider').value = typeof data.brightness !== 'undefined' ? data.brightness : 10;
             document.getElementById('brightnessValue').textContent = (document.getElementById('brightnessSlider').value == -1 ? 'Off' : document.getElementById('brightnessSlider').value);
-            document.getElementById('flipDisplay').checked = !!data.flipDisplay;
-            document.getElementById('ntpServer1').value = data.ntpServer1 || "";
-            document.getElementById('ntpServer2').value = data.ntpServer2 || "";
-            document.getElementById('twelveHourToggle').checked = !!data.twelveHourToggle;
-            document.getElementById('showDayOfWeek').checked = !!data.showDayOfWeek;
-            document.getElementById('showDate').checked = !!data.showDate;
-            document.getElementById('showHumidity').checked = !!data.showHumidity;
-            document.getElementById('colonBlinkEnabled').checked = !!data.colonBlinkEnabled;
-            document.getElementById('showWeatherDescription').checked = !!data.showWeatherDescription;
+
+            loadCheckboxes(data, [
+                'flipDisplay', 'twelveHourToggle', 'showDayOfWeek', 'showDate',
+                'showHumidity', 'colonBlinkEnabled', 'showWeatherDescription',
+                'apiEnabled', 'webhooksEnabled', 'authEnabled', 'totpEnabled'
+            ]);
+
             document.getElementById('mdnsEnabled').checked = data.mdnsEnabled !== false;
-            document.getElementById('mdnsHostname').value = data.mdnsHostname || 'esptimecast';
-            document.getElementById('apiEnabled').checked = !!data.apiEnabled;
-            // Webhooks
-            document.getElementById('webhooksEnabled').checked = !!data.webhooksEnabled;
-            document.getElementById('webhookKey').value = data.webhookKey || '';
+
             document.getElementById('webhookQueueSize').value = data.webhookQueueSize || 5;
             document.getElementById('queueSizeValue').textContent = data.webhookQueueSize || 5;
             document.getElementById('webhookQuietHours').checked = data.webhookQuietHours !== false;
 
-            // Show/hide webhook settings
             if (data.webhooksEnabled) {
                 document.getElementById('webhookSettings').style.display = 'block';
             }
 
-            // YT
             document.getElementById('youtubeEnabled').checked = !!(data.youtube && data.youtube.enabled);
             document.getElementById('youtubeApiKey').value = (data.youtube && data.youtube.apiKey) || '';
             document.getElementById('youtubeChannelId').value = (data.youtube && data.youtube.channelId) || '';
             document.getElementById('youtubeShortFormat').checked = data.youtube ? data.youtube.shortFormat : true;
-            // Auth
-            document.getElementById('authEnabled').checked = !!data.authEnabled;
-            document.getElementById('adminPassword').value = data.adminPassword || '';
-            document.getElementById('totpEnabled').checked = !!data.totpEnabled;
+
             if (data.authEnabled) {
                 document.getElementById('authSettings').style.display = 'block';
             }
             if (data.totpEnabled) {
                 document.getElementById('totpSetup').style.display = 'block';
             }
-            // Dimming controls
-            const dimmingEnabledEl = document.getElementById('dimmingEnabled');
-            const isDimming = (data.dimmingEnabled === true || data.dimmingEnabled === "true" || data.dimmingEnabled === 1);
-            dimmingEnabledEl.checked = isDimming;
 
-// Defer field enabling until checkbox state is rendered
+            const dimmingEnabledEl = document.getElementById('dimmingEnabled');
+            dimmingEnabledEl.checked = (data.dimmingEnabled === true || data.dimmingEnabled === 'true' || data.dimmingEnabled === 1);
+
+            // Defer field enabling until checkbox state is rendered
             setTimeout(() => {
                 setDimmingFieldsEnabled(dimmingEnabledEl.checked);
                 setYoutubeFieldsEnabled(document.getElementById('youtubeEnabled').checked);
@@ -262,35 +226,31 @@ window.onload = function () {
                 setDimmingFieldsEnabled(this.checked);
             });
 
-            document.getElementById('youtubeEnabled').addEventListener('change', function() {
+            document.getElementById('youtubeEnabled').addEventListener('change', function () {
                 setYoutubeEnabled(this.checked);
                 setYoutubeFieldsEnabled(this.checked);
             });
 
             document.getElementById('dimStartTime').value =
-                (data.dimStartHour !== undefined ? String(data.dimStartHour).padStart(2, '0') : "18") + ":" +
-                (data.dimStartMinute !== undefined ? String(data.dimStartMinute).padStart(2, '0') : "00");
+                (data.dimStartHour !== undefined ? String(data.dimStartHour).padStart(2, '0') : '18') + ':' +
+                (data.dimStartMinute !== undefined ? String(data.dimStartMinute).padStart(2, '0') : '00');
 
             document.getElementById('dimEndTime').value =
-                (data.dimEndHour !== undefined ? String(data.dimEndHour).padStart(2, '0') : "08") + ":" +
-                (data.dimEndMinute !== undefined ? String(data.dimEndMinute).padStart(2, '0') : "00");
+                (data.dimEndHour !== undefined ? String(data.dimEndHour).padStart(2, '0') : '08') + ':' +
+                (data.dimEndMinute !== undefined ? String(data.dimEndMinute).padStart(2, '0') : '00');
 
             document.getElementById('dimBrightness').value = (data.dimBrightness !== undefined ? data.dimBrightness : 2);
-            // Then update the span's text content with that value
             document.getElementById('dimmingBrightnessValue').textContent = (document.getElementById('dimBrightness').value == -1 ? 'Off' : document.getElementById('dimBrightness').value);
 
             setDimmingFieldsEnabled(!!data.dimmingEnabled);
 
-            // --- NEW: Populate Countdown Fields ---
             document.getElementById('isDramaticCountdown').checked = !!(data.countdown && data.countdown.isDramaticCountdown);
-            const countdownEnabledEl = document.getElementById('countdownEnabled'); // Get reference
+            const countdownEnabledEl = document.getElementById('countdownEnabled');
             countdownEnabledEl.checked = !!(data.countdown && data.countdown.enabled);
 
             if (data.countdown && data.countdown.targetTimestamp) {
-                // Convert Unix timestamp (seconds) to milliseconds for JavaScript Date object
                 const targetDate = new Date(data.countdown.targetTimestamp * 1000);
                 const year = targetDate.getFullYear();
-                // Month is 0-indexed in JS, so add 1
                 const month = (targetDate.getMonth() + 1).toString().padStart(2, '0');
                 const day = targetDate.getDate().toString().padStart(2, '0');
                 const hours = targetDate.getHours().toString().padStart(2, '0');
@@ -299,35 +259,24 @@ window.onload = function () {
                 document.getElementById('countdownDate').value = `${year}-${month}-${day}`;
                 document.getElementById('countdownTime').value = `${hours}:${minutes}`;
             } else {
-                // Clear fields if no target timestamp is set
                 document.getElementById('countdownDate').value = '';
                 document.getElementById('countdownTime').value = '';
             }
-            // --- END NEW ---
 
-            // --- NEW: Countdown Label Input Validation ---
             const countdownLabelInput = document.getElementById('countdownLabel');
-            countdownLabelInput.addEventListener('input', function() {
-                // Convert to uppercase and remove any characters that are not A-Z or space
-                // Note: The `maxlength` attribute in HTML handles the length limit.
+            countdownLabelInput.addEventListener('input', function () {
                 this.value = this.value.toUpperCase().replace(/[^A-Z0-9 :!'.\-]/g, '');
             });
-            // Set initial value for countdownLabel from config.json (apply validation on load too)
+
             if (data.countdown && data.countdown.label) {
                 countdownLabelInput.value = data.countdown.label.toUpperCase().replace(/[^A-Z0-9 :!'.\-]/g, '');
             } else {
                 countdownLabelInput.value = '';
             }
-            // --- END NEW ---
 
-
-            // --- NEW: Countdown Toggle Event Listener & Field Enabling ---
-            // If you're using onchange="setCountdownEnabled(this.checked)" directly in HTML,
-            // you would add setCountdownFieldsEnabled(this.checked) there as well.
-            // If you are using addEventListener, keep this:
-            countdownEnabledEl.addEventListener('change', function() {
-                setCountdownEnabled(this.checked);       // Sends command to ESP
-                setCountdownFieldsEnabled(this.checked); // Enables/disables local fields
+            countdownEnabledEl.addEventListener('change', function () {
+                setCountdownEnabled(this.checked);
+                setCountdownFieldsEnabled(this.checked);
             });
 
             const dramaticCountdownEl = document.getElementById('isDramaticCountdown');
@@ -335,18 +284,12 @@ window.onload = function () {
                 setIsDramaticCountdown(this.checked);
             });
 
-            // Set initial state of fields when page loads
             setCountdownFieldsEnabled(countdownEnabledEl.checked);
-            // --- END NEW ---
 
-            // Auto-detect browser's timezone if not set in config
             if (!data.timeZone) {
                 try {
                     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                    if (
-                        tz &&
-                        document.getElementById('timeZone').querySelector(`[value="${tz}"]`)
-                    ) {
+                    if (tz && document.getElementById('timeZone').querySelector(`[value="${tz}"]`)) {
                         document.getElementById('timeZone').value = tz;
                     } else {
                         document.getElementById('timeZone').value = '';
@@ -360,29 +303,27 @@ window.onload = function () {
         })
         .catch(err => {
             console.error('Failed to load config:', err);
-            showSavingModal("");
-            updateSavingModal("⚠️ Failed to load configuration.", false);
+            showSavingModal('');
+            updateSavingModal('⚠️ Failed to load configuration.', false);
 
-            // Show appropriate button for load error
             removeReloadButton();
             removeRestoreButton();
-            const errorMsg = (err.message || "").toLowerCase();
-            if (
-                errorMsg.includes("config corrupted") ||
-                errorMsg.includes("failed to write config") ||
-                errorMsg.includes("restore")
-            ) {
+            const errorMsg = (err.message || '').toLowerCase();
+            if (errorMsg.includes('config corrupted') || errorMsg.includes('failed to write config') || errorMsg.includes('restore')) {
                 ensureRestoreButton();
             } else {
                 ensureReloadButton();
             }
         });
-    document.querySelector('html').style.height = 'unset';
+
+    document.documentElement.style.height = 'unset';
     document.body.classList.add('loaded');
 };
 
+// Form submission
 async function submitConfig(event) {
     event.preventDefault();
+    if (isSaving) return;
     isSaving = true;
 
     const form = document.getElementById('configForm');
@@ -393,156 +334,127 @@ async function submitConfig(event) {
     formData.set('clockDuration', clockDuration);
     formData.set('weatherDuration', weatherDuration);
 
-    // Advanced: ensure correct values are set for advanced fields
     formData.set('brightness', document.getElementById('brightnessSlider').value);
-    formData.set('flipDisplay', document.getElementById('flipDisplay').checked ? 'on' : '');
-    formData.set('twelveHourToggle', document.getElementById('twelveHourToggle').checked ? 'on' : '');
-    formData.set('showDayOfWeek', document.getElementById('showDayOfWeek').checked ? 'on' : '');
-    formData.set('showDate', document.getElementById('showDate').checked ? 'on' : '');
-    formData.set('showHumidity', document.getElementById('showHumidity').checked ? 'on' : '');
-    formData.set('colonBlinkEnabled', document.getElementById('colonBlinkEnabled').checked ? 'on' : '');
 
-    //dimming
+    appendCheckboxesToFormData(formData, [
+        'flipDisplay', 'twelveHourToggle', 'showDayOfWeek', 'showDate',
+        'showHumidity', 'colonBlinkEnabled', 'showWeatherDescription',
+        'apiEnabled', 'authEnabled', 'totpEnabled'
+    ]);
+
     formData.set('dimmingEnabled', document.getElementById('dimmingEnabled').checked ? 'true' : 'false');
-    const dimStart = document.getElementById('dimStartTime').value; // "18:45"
-    const dimEnd = document.getElementById('dimEndTime').value;     // "08:30"
+    const dimStart = document.getElementById('dimStartTime').value;
+    const dimEnd = document.getElementById('dimEndTime').value;
 
-    // Parse hour and minute
     if (dimStart) {
-        const [startHour, startMin] = dimStart.split(":").map(x => parseInt(x, 10));
+        const [startHour, startMin] = dimStart.split(':').map(x => parseInt(x, 10));
         formData.set('dimStartHour', startHour);
         formData.set('dimStartMinute', startMin);
     }
     if (dimEnd) {
-        const [endHour, endMin] = dimEnd.split(":").map(x => parseInt(x, 10));
+        const [endHour, endMin] = dimEnd.split(':').map(x => parseInt(x, 10));
         formData.set('dimEndHour', endHour);
         formData.set('dimEndMinute', endMin);
     }
     formData.set('dimBrightness', document.getElementById('dimBrightness').value);
-    formData.set('showWeatherDescription', document.getElementById('showWeatherDescription').checked ? 'on' : '');
     formData.set('weatherUnits', document.getElementById('weatherUnits').checked ? 'imperial' : 'metric');
-    // mDNS
+
     formData.set('mdnsEnabled', document.getElementById('mdnsEnabled').checked ? 'true' : 'false');
     formData.set('mdnsHostname', document.getElementById('mdnsHostname').value || 'esptimecast');
-    // API
-    formData.set('apiEnabled', document.getElementById('apiEnabled').checked ? 'on' : '');
 
-    // --- NEW: Countdown Form Data ---
     formData.set('countdownEnabled', document.getElementById('countdownEnabled').checked ? 'true' : 'false');
     formData.set('isDramaticCountdown', document.getElementById('isDramaticCountdown').checked ? 'true' : 'false');
-    // Date and Time inputs are already handled by formData if they have a 'name' attribute
-    // 'countdownDate' and 'countdownTime' are collected automatically
-    // Also apply the same validation for the label when submitting
     const finalCountdownLabel = document.getElementById('countdownLabel').value.toUpperCase().replace(/[^A-Z0-9 :!'.\-]/g, '');
     formData.set('countdownLabel', finalCountdownLabel);
-    // --- NEW: Webhook Form Data ---
-    formData.set('webhooksEnabled', document.getElementById('webhooksEnabled').checked ? 'true' : 'false');
+
+    appendBoolCheckboxesToFormData(formData, ['webhooksEnabled', 'webhookQuietHours']);
     formData.set('webhookKey', document.getElementById('webhookKey').value);
     formData.set('webhookQueueSize', document.getElementById('webhookQueueSize').value);
-    formData.set('webhookQuietHours', document.getElementById('webhookQuietHours').checked ? 'true' : 'false');
-    // --- NEW: YouTube Form Data ---
-    formData.set('youtubeEnabled', document.getElementById('youtubeEnabled').checked ? 'true' : 'false');
+
+    appendBoolCheckboxesToFormData(formData, ['youtubeEnabled', 'youtubeShortFormat']);
     formData.set('youtubeApiKey', document.getElementById('youtubeApiKey').value);
     formData.set('youtubeChannelId', document.getElementById('youtubeChannelId').value);
-    formData.set('youtubeShortFormat', document.getElementById('youtubeShortFormat').checked ? 'true' : 'false');
-    // --- NEW: Auth Form Data ---
-    formData.set('authEnabled', document.getElementById('authEnabled').checked ? 'on' : '');
+
     formData.set('adminPassword', document.getElementById('adminPassword').value);
-    formData.set('totpEnabled', document.getElementById('totpEnabled').checked ? 'on' : '');
-    // --- END NEW ---
 
     const params = new URLSearchParams();
     for (const pair of formData.entries()) {
         params.append(pair[0], pair[1]);
     }
 
-    showSavingModal("Saving...");
+    showSavingModal('Saving...');
 
-    // Check AP mode status
-    let isAPMode = false;
+    let currentIsAPMode = false;
     try {
         const apStatusResponse = await fetch('/ap_status');
         const apStatusData = await apStatusResponse.json();
-        isAPMode = apStatusData.isAP;
+        currentIsAPMode = apStatusData.isAP;
     } catch (error) {
-        console.error("Error fetching AP status:", error);
-        // Handle error appropriately (e.g., assume not in AP mode)
+        console.error('Error fetching AP status:', error);
     }
 
-    fetch('/save', {
-        method: 'POST',
-        headers: {
-            'X-Auth-Token': sessionStorage.getItem('token') || ''
-        },
-        body: params
-    })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(json => {
-                    throw new Error(`Server error ${response.status}: ${json.error}`);
-                });
-            }
-            return response.json();
-        })
-        .then(json => {
-            isSaving = false;
-            removeReloadButton();
-            removeRestoreButton();
-            if (isAPMode) {
-                updateSavingModal("✅ Settings saved successfully!<br><br>Rebooting the device now... ", false);
-                setTimeout(() => {
-                    document.getElementById('configForm').style.display = 'none';
-                    document.querySelector('.footer').style.display = 'none';
-                    document.querySelector('html').style.height = '100vh';
-                    document.body.style.height = '100vh';
-                    document.getElementById('configForm').style.display = 'none';
-                    updateSavingModal("✅ All done!<br>You can now close this tab safely.<br><br>Your device is now rebooting and connecting to your Wi-Fi. Its new IP address will appear on the display for future access.", false);
-                }, 5000);
-            } else {
-                updateSavingModal("✅ Configuration saved successfully.<br><br>Device will reboot", false);
-                setTimeout(() => location.href = location.href.split('#')[0], 3000);
-            }
-        })
-        .catch(err => {
-            isSaving = false;
-
-            if (isAPMode && err.message.includes("Failed to fetch")) {
-                console.warn("Expected disconnect in AP mode after reboot.");
-                showSavingModal("");
-                updateSavingModal("✅ Settings saved successfully!<br><br>Rebooting the device now... ", false);
-                setTimeout(() => {
-                    document.getElementById('configForm').style.display = 'none';
-                    updateSavingModal("✅ All done!<br>You can now close this tab safely.<br><br>Your device is now rebooting and connecting to your Wi-Fi. Its new IP address will appear on the display for future access.", false);
-                }, 5000);
-                removeReloadButton();
-                removeRestoreButton();
-                return;
-            }
-
-            console.error('Save error:', err);
-            let friendlyMessage = "⚠️ Something went wrong while saving the configuration.";
-            if (err.message.includes("Failed to fetch")) {
-                friendlyMessage = "⚠️ Cannot connect to the device.<br>Is it powered on and connected?";
-            }
-
-            updateSavingModal(`${friendlyMessage}<br><br>Details: ${err.message}`, false);
-
-            // Show only one action button, based on error content
-            removeReloadButton();
-            removeRestoreButton();
-            const errorMsg = (err.message || "").toLowerCase();
-            if (
-                errorMsg.includes("config corrupted") ||
-                errorMsg.includes("failed to write config") ||
-                errorMsg.includes("restore")
-            ) {
-                ensureRestoreButton();
-            } else {
-                ensureReloadButton();
-            }
+    try {
+        const response = await fetch('/save', {
+            method: 'POST',
+            headers: { 'X-Auth-Token': sessionStorage.getItem('token') || '' },
+            body: params
         });
+
+        if (!response.ok) {
+            const json = await response.json();
+            throw new Error(`Server error ${response.status}: ${json.error}`);
+        }
+
+        removeReloadButton();
+        removeRestoreButton();
+
+        if (currentIsAPMode) {
+            updateSavingModal('✅ Settings saved successfully!<br><br>Rebooting the device now...', false);
+            await new Promise(r => setTimeout(r, 5000));
+            document.getElementById('configForm').style.display = 'none';
+            document.querySelector('.footer').style.display = 'none';
+            document.documentElement.style.height = '100vh';
+            document.body.style.height = '100vh';
+            updateSavingModal('✅ All done!<br>You can now close this tab safely.<br><br>Your device is now rebooting and connecting to your Wi-Fi. Its new IP address will appear on the display for future access.', false);
+        } else {
+            updateSavingModal('✅ Configuration saved successfully.<br><br>Device will reboot', false);
+            setTimeout(() => location.href = location.href.split('#')[0], 3000);
+        }
+    } catch (err) {
+        if (currentIsAPMode && err.message.includes('Failed to fetch')) {
+            console.warn('Expected disconnect in AP mode after reboot.');
+            showSavingModal('');
+            updateSavingModal('✅ Settings saved successfully!<br><br>Rebooting the device now...', false);
+            await new Promise(r => setTimeout(r, 5000));
+            document.getElementById('configForm').style.display = 'none';
+            updateSavingModal('✅ All done!<br>You can now close this tab safely.<br><br>Your device is now rebooting and connecting to your Wi-Fi. Its new IP address will appear on the display for future access.', false);
+            removeReloadButton();
+            removeRestoreButton();
+            return;
+        }
+
+        console.error('Save error:', err);
+        let friendlyMessage = '⚠️ Something went wrong while saving the configuration.';
+        if (err.message.includes('Failed to fetch')) {
+            friendlyMessage = '⚠️ Cannot connect to the device.<br>Is it powered on and connected?';
+        }
+
+        updateSavingModal(`${friendlyMessage}<br><br>Details: ${err.message}`, false);
+
+        removeReloadButton();
+        removeRestoreButton();
+        const errorMsg = (err.message || '').toLowerCase();
+        if (errorMsg.includes('config corrupted') || errorMsg.includes('failed to write config') || errorMsg.includes('restore')) {
+            ensureRestoreButton();
+        } else {
+            ensureReloadButton();
+        }
+    } finally {
+        isSaving = false;
+    }
 }
 
+// Modal
 function showSavingModal(message) {
     let modal = document.getElementById('savingModal');
     if (!modal) {
@@ -568,8 +480,7 @@ function updateSavingModal(message, showSpinner = false) {
     modalText.innerHTML = message;
     document.querySelector('#savingModal .spinner').style.display = showSpinner ? 'block' : 'none';
 
-    // Remove reload/restore buttons if no longer needed
-    if (message.includes("saved successfully") || message.includes("Backup restored") || message.includes("All done!")) {
+    if (message.includes('saved successfully') || message.includes('Backup restored') || message.includes('All done!')) {
         removeReloadButton();
         removeRestoreButton();
     }
@@ -587,7 +498,7 @@ function ensureReloadButton(options = {}) {
         btn.style.margin = '1rem 0.5rem 0 0';
         modalContent.appendChild(btn);
     }
-    btn.textContent = options.text || "Reload Page";
+    btn.textContent = options.text || 'Reload Page';
     btn.onclick = options.onClick || (() => location.reload());
     btn.style.display = 'inline-block';
     return btn;
@@ -605,7 +516,7 @@ function ensureRestoreButton(options = {}) {
         btn.style.margin = '1rem 0 0 0.5rem';
         modalContent.appendChild(btn);
     }
-    btn.textContent = options.text || "Restore Backup";
+    btn.textContent = options.text || 'Restore Backup';
     btn.onclick = options.onClick || restoreBackupConfig;
     btn.style.display = 'inline-block';
     return btn;
@@ -615,58 +526,47 @@ function removeReloadButton() {
     let btn = document.getElementById('reloadButton');
     if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
 }
+
 function removeRestoreButton() {
     let btn = document.getElementById('restoreButton');
     if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
 }
 
-function restoreBackupConfig() {
-    showSavingModal("Restoring backup...");
+async function restoreBackupConfig() {
+    showSavingModal('Restoring backup...');
     removeReloadButton();
     removeRestoreButton();
 
-    fetch('/restore', {
-        method: 'POST',
-        headers: {
-            'X-Auth-Token': sessionStorage.getItem('token') || ''
-        }
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("Server returned an error");
-            }
-            return response.json();
-        })
-        .then(data => {
-            updateSavingModal("✅ Backup restored! Device will now reboot.");
-            setTimeout(() => location.reload(), 1500);
-        })
-        .catch(err => {
-            console.error("Restore error:", err);
-            updateSavingModal(`❌ Failed to restore backup: ${err.message}`, false);
-
-            // Show only one button, for backup restore failures show reload.
-            removeReloadButton();
-            removeRestoreButton();
-            ensureReloadButton();
+    try {
+        const response = await fetch('/restore', {
+            method: 'POST',
+            headers: { 'X-Auth-Token': sessionStorage.getItem('token') || '' }
         });
-}
 
-function hideSavingModal() {
-    const modal = document.getElementById('savingModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.classList.remove('modal-open');
+        if (!response.ok) {
+            throw new Error('Server returned an error');
+        }
+
+        updateSavingModal('✅ Backup restored! Device will now reboot.');
+        setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+        console.error('Restore error:', err);
+        updateSavingModal(`❌ Failed to restore backup: ${err.message}`, false);
+        removeReloadButton();
+        removeRestoreButton();
+        ensureReloadButton();
     }
 }
 
+// Collapsible
 const toggle = document.querySelector('.collapsible-toggle');
 const content = document.querySelector('.collapsible-content');
-toggle.addEventListener('click', function() {
+
+toggle.addEventListener('click', function () {
     const isOpen = toggle.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen);
     content.setAttribute('aria-hidden', !isOpen);
-    if(isOpen) {
+    if (isOpen) {
         content.style.height = content.scrollHeight + 'px';
         content.addEventListener('transitionend', function handler() {
             content.style.height = 'auto';
@@ -674,117 +574,44 @@ toggle.addEventListener('click', function() {
         });
     } else {
         content.style.height = content.scrollHeight + 'px';
-        // Force reflow to make sure the browser notices the height before transitioning to 0
         void content.offsetHeight;
         content.style.height = '0px';
     }
 });
+
 // Optional: If open on load, set height to auto
-if(toggle.classList.contains('open')) {
+if (toggle.classList.contains('open')) {
     content.style.height = 'auto';
 }
 
+// Live settings
 let brightnessDebounceTimeout = null;
 
 function setBrightnessLive(val) {
-    // Cancel the previous timeout if it exists
     if (brightnessDebounceTimeout) {
         clearTimeout(brightnessDebounceTimeout);
     }
-    // Set a new timeout
     brightnessDebounceTimeout = setTimeout(() => {
-        fetch('/set_brightness', {
-            method: 'POST',
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: "value=" + encodeURIComponent(val)
-        })
-            .then(res => res.json())
-            .catch(e => {}); // Optionally handle errors
-    }, 150); // 150ms debounce, adjust as needed
+        postEncodedValue('/set_brightness', val);
+    }, 150);
 }
 
-function setFlipDisplay(val) {
-    fetch('/set_flip', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
+function setFlipDisplay(val) { postBoolValue('/set_flip', val); }
+function setTwelveHour(val) { postBoolValue('/set_twelvehour', val); }
+function setShowDayOfWeek(val) { postBoolValue('/set_dayofweek', val); }
+function setShowDate(val) { postBoolValue('/set_showdate', val); }
+function setColonBlink(val) { postBoolValue('/set_colon_blink', val); }
+function setShowHumidity(val) { postBoolValue('/set_humidity', val); }
+function setLanguage(val) { postEncodedValue('/set_language', val); }
+function setShowWeatherDescription(val) { postBoolValue('/set_weatherdesc', val); }
+function setWeatherUnits(val) { postBoolValue('/set_units', val); }
+function setApiEnabled(val) { postBoolValue('/set_api', val); }
+function setCountdownEnabled(val) { postBoolValue('/set_countdown_enabled', val); }
+function setIsDramaticCountdown(val) { postBoolValue('/set_dramatic_countdown', val); }
+function setYoutubeEnabled(val) { postBoolValue('/set_youtube_enabled', val); }
+function setYoutubeShortFormat(val) { postBoolValue('/set_youtube_format', val); }
 
-function setTwelveHour(val) {
-    fetch('/set_twelvehour', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setShowDayOfWeek(val) {
-    fetch('/set_dayofweek', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setShowDate(val) {
-    fetch('/set_showdate', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setColonBlink(val) {
-    fetch('/set_colon_blink', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setShowHumidity(val) {
-    fetch('/set_humidity', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setLanguage(val) {
-    fetch('/set_language', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + encodeURIComponent(val)
-    });
-}
-
-function setShowWeatherDescription(val) {
-    fetch('/set_weatherdesc', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setWeatherUnits(val) {
-    fetch('/set_units', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-function setApiEnabled(val) {
-    fetch('/set_api', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-}
-
-// --- Countdown Controls Logic ---
-// NEW: Function to enable/disable countdown specific fields
+// Countdown
 function setCountdownFieldsEnabled(enabled) {
     document.getElementById('countdownLabel').disabled = !enabled;
     document.getElementById('countdownDate').disabled = !enabled;
@@ -792,99 +619,52 @@ function setCountdownFieldsEnabled(enabled) {
     document.getElementById('isDramaticCountdown').disabled = !enabled;
 }
 
-// Existing function to send countdown enable/disable command to ESP
-function setCountdownEnabled(val) {
-    fetch('/set_countdown_enabled', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0) // Send 1 for true, 0 for false
-    });
-}
-
-function setIsDramaticCountdown(val) {
-    fetch('/set_dramatic_countdown', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0) // Send 1 for true, 0 for false
-    });
-}
-
-// --- END Countdown Controls Logic ---
-
-
-// --- Dimming Controls Logic ---
+// Dimming
 function setDimmingFieldsEnabled(enabled) {
     document.getElementById('dimStartTime').disabled = !enabled;
     document.getElementById('dimEndTime').disabled = !enabled;
     document.getElementById('dimBrightness').disabled = !enabled;
 }
 
-function getLocation() {
-    fetch('http://ip-api.com/json/')
-        .then(response => response.json())
-        .then(data => {
-            // Update your latitude/longitude fields
-            document.getElementById('openMeteoLatitude').value = data.lat;
-            document.getElementById('openMeteoLongitude').value = data.lon;
-
-            // Determine the label to show on the button
-            const button = document.getElementById('geo-button');
-            let label = data.city;
-            if (!label) label = data.regionName;
-            if (!label) label = data.country;
-            if (!label) label = "Location Found";
-
-            button.textContent = "Location: " + label;
-            button.disabled = true;
-            button.classList.add('geo-disabled');
-
-            console.log("Location fetched via ip-api.com. Free service: http://ip-api.com/");
-        })
-        .catch(error => {
-            alert(
-                "Failed to guess your location.\n\n" +
-                "This may happen if:\n" +
-                "- You are using an AdBlocker\n" +
-                "- There is a network issue\n" +
-                "- The service might be temporarily down.\n\n" +
-                "You can visit https://www.openstreetmap.org to manually search for your city and get latitude/longitude."
-            );
-        });
-}
-
-// Webhook
-function setWebhooks(val) {
-    fetch('/set_webhooks', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
-
-    document.getElementById('webhookSettings').style.display = val ? 'block' : 'none';
-}
-
-// --- YouTube Controls Logic ---
+// YouTube
 function setYoutubeFieldsEnabled(enabled) {
     document.getElementById('youtubeApiKey').disabled = !enabled;
     document.getElementById('youtubeChannelId').disabled = !enabled;
     document.getElementById('youtubeShortFormat').disabled = !enabled;
-
-    // Show/hide the settings div
     document.getElementById('youtubeSettings').style.display = enabled ? 'block' : 'none';
 }
 
-function setYoutubeEnabled(val) {
-    fetch('/set_youtube_enabled', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
+// Webhooks
+function setWebhooks(val) {
+    postBoolValue('/set_webhooks', val);
+    document.getElementById('webhookSettings').style.display = val ? 'block' : 'none';
 }
 
-function setYoutubeShortFormat(val) {
-    fetch('/set_youtube_format', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "value=" + (val ? 1 : 0)
-    });
+// Geolocation
+function getLocation() {
+    fetch('http://ip-api.com/json/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('openMeteoLatitude').value = data.lat;
+            document.getElementById('openMeteoLongitude').value = data.lon;
+
+            const button = document.getElementById('geo-button');
+            let label = data.city || data.regionName || data.country || 'Location Found';
+
+            button.textContent = 'Location: ' + label;
+            button.disabled = true;
+            button.classList.add('geo-disabled');
+
+            console.log('Location fetched via ip-api.com. Free service: http://ip-api.com/');
+        })
+        .catch(error => {
+            alert(
+                'Failed to guess your location.\n\n' +
+                'This may happen if:\n' +
+                '- You are using an AdBlocker\n' +
+                '- There is a network issue\n' +
+                '- The service might be temporarily down.\n\n' +
+                'You can visit https://www.openstreetmap.org to manually search for your city and get latitude/longitude.'
+            );
+        });
 }
