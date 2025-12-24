@@ -2321,6 +2321,11 @@ void fetchOpenWeather() {
 
   int httpCode = http.GET();
 
+  auto cleanup = [&]() {
+    http.end();
+    client.stop();
+  };
+
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     Serial.println(F("[WEATHER] Response received."));
@@ -2332,7 +2337,7 @@ void fetchOpenWeather() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      http.end();
+      cleanup();
       return;
     }
 
@@ -2364,8 +2369,7 @@ void fetchOpenWeather() {
     weatherAvailable = false;
   }
 
-  http.end();
-  client.stop();
+  cleanup();
 }
 
 void fetchPirateWeather() {
@@ -2413,6 +2417,11 @@ void fetchPirateWeather() {
 
   int httpCode = http.GET();
 
+  auto cleanup = [&]() {
+    http.end();
+    client.stop();
+  };
+
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     Serial.println(F("[WEATHER] Response received."));
@@ -2424,7 +2433,7 @@ void fetchPirateWeather() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      http.end();
+      cleanup();
       return;
     }
 
@@ -2454,8 +2463,7 @@ void fetchPirateWeather() {
     weatherAvailable = false;
   }
 
-  http.end();
-  client.stop();
+  cleanup();
 }
 
 void fetchOpenMeteo() {
@@ -2499,6 +2507,11 @@ void fetchOpenMeteo() {
 
   int httpCode = http.GET();
 
+  auto cleanup = [&]() {
+    http.end();
+    client.stop();
+  };
+
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     Serial.println(F("[WEATHER] Response received."));
@@ -2510,7 +2523,7 @@ void fetchOpenMeteo() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      http.end();
+      cleanup();
       return;
     }
 
@@ -2538,8 +2551,7 @@ void fetchOpenMeteo() {
     weatherAvailable = false;
   }
 
-  http.end();
-  client.stop();
+  cleanup();
 }
 
 void fetchWeather() {
@@ -2665,6 +2677,7 @@ void fetchYoutubeSubscribers() {
   }
 
   https.end();
+  client.stop();
   lastYoutubeFetch = millis();
 }
 
@@ -3801,6 +3814,7 @@ void loop() {
       }
 
       https.end();
+      client.stop();
       lastNightscoutFetchTime = millis();  // Update the timestamp
     }
 
