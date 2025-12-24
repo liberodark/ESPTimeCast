@@ -2282,7 +2282,7 @@ void fetchOpenWeather() {
     return;
   }
 
-  Serial.println(F("[WEATHER] Fetching weather data from OpenWeatherMap..."));
+  Serial.println(F("[WEATHER] Fetching from OpenWeatherMap..."));
 
   if (strlen(weatherApiKey) == 0) {
     Serial.println(F("[WEATHER] No API key for OpenWeatherMap"));
@@ -2293,7 +2293,11 @@ void fetchOpenWeather() {
   float lat = atof(openMeteoLatitude);
   float lon = atof(openMeteoLongitude);
 
-  String url = "https://api.openweathermap.org/data/2.5/weather?";
+  #ifdef ESP32
+    String url = "https://api.openweathermap.org/data/2.5/weather?";
+  #else // ESP8266
+    String url = "http://api.openweathermap.org/data/2.5/weather?";
+  #endif
   url += "lat=" + String(lat, 6);
   url += "&lon=" + String(lon, 6);
   url += "&appid=" + String(weatherApiKey);
@@ -2315,9 +2319,7 @@ void fetchOpenWeather() {
     WiFiClientSecure client;
     client.setInsecure();
   #else // ESP8266
-    BearSSL::WiFiClientSecure client;
-    client.setInsecure();
-    client.setBufferSizes(512, 512);
+    WiFiClient client;
   #endif
 
   HTTPClient http;
@@ -2326,11 +2328,6 @@ void fetchOpenWeather() {
   http.setReuse(false);
 
   int httpCode = http.GET();
-
-  auto cleanup = [&]() {
-    http.end();
-    client.stop();
-  };
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -2343,7 +2340,7 @@ void fetchOpenWeather() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      cleanup();
+      http.end();
       return;
     }
 
@@ -2375,7 +2372,7 @@ void fetchOpenWeather() {
     weatherAvailable = false;
   }
 
-  cleanup();
+  http.end();
 }
 
 void fetchPirateWeather() {
@@ -2395,7 +2392,11 @@ void fetchPirateWeather() {
   float lat = atof(openMeteoLatitude);
   float lon = atof(openMeteoLongitude);
 
-  String url = "http://api.pirateweather.net/forecast/";
+  #ifdef ESP32
+    String url = "https://api.pirateweather.net/forecast/";
+  #else // ESP8266
+    String url = "http://api.pirateweather.net/forecast/";
+  #endif
   url += String(weatherApiKey) + "/";
   url += String(lat, 6) + "," + String(lon, 6);
   url += "?units=" + String(strcmp(weatherUnits, "imperial") == 0 ? "us" : "si");
@@ -2404,7 +2405,12 @@ void fetchPirateWeather() {
   Serial.print(F("[WEATHER] URL: "));
   Serial.println(url);
 
-  WiFiClient client;
+  #ifdef ESP32
+    WiFiClientSecure client;
+    client.setInsecure();
+  #else // ESP8266
+    WiFiClient client;
+  #endif
 
   HTTPClient http;
   http.begin(client, url);
@@ -2463,12 +2469,16 @@ void fetchOpenMeteo() {
     return;
   }
 
-  Serial.println(F("[WEATHER] Fetching weather data from Open-Meteo..."));
+  Serial.println(F("[WEATHER] Fetching from Open-Meteo..."));
 
   float lat = atof(openMeteoLatitude);
   float lon = atof(openMeteoLongitude);
 
-  String url = "https://api.open-meteo.com/v1/forecast?";
+  #ifdef ESP32
+    String url = "https://api.open-meteo.com/v1/forecast?";
+  #else // ESP8266
+    String url = "http://api.open-meteo.com/v1/forecast?";
+  #endif
   url += "latitude=" + String(lat, 6);
   url += "&longitude=" + String(lon, 6);
   url += "&current=temperature_2m,relative_humidity_2m,weather_code";
@@ -2486,9 +2496,7 @@ void fetchOpenMeteo() {
     WiFiClientSecure client;
     client.setInsecure();
   #else // ESP8266
-    BearSSL::WiFiClientSecure client;
-    client.setInsecure();
-    client.setBufferSizes(512, 512);
+    WiFiClient client;
   #endif
 
   HTTPClient http;
@@ -2497,11 +2505,6 @@ void fetchOpenMeteo() {
   http.setReuse(false);
 
   int httpCode = http.GET();
-
-  auto cleanup = [&]() {
-    http.end();
-    client.stop();
-  };
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -2514,7 +2517,7 @@ void fetchOpenMeteo() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
-      cleanup();
+      http.end();
       return;
     }
 
@@ -2542,7 +2545,7 @@ void fetchOpenMeteo() {
     weatherAvailable = false;
   }
 
-  cleanup();
+  http.end();
 }
 
 void fetchWeather() {
