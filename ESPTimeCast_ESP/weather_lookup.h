@@ -31,6 +31,23 @@ typedef struct {
         const char* broken_clouds;
         const char* scattered_clouds;
         const char* few_clouds;
+        const char* sleet;
+        const char* flurries;
+        const char* wind;
+        const char* haze;
+        const char* smoke;
+        const char* precipitation;
+        const char* intensity;
+        const char* freezing;
+        const char* shower;
+        const char* extreme;
+        const char* very;
+        const char* sand;
+        const char* dust;
+        const char* ash;
+        const char* volcanic;
+        const char* squall;
+        const char* tornado;
     } terms;
 } WeatherTermsMapping;
 
@@ -117,40 +134,52 @@ inline const char* getWeatherByCode(int code, const char* lang) {
 
 const WeatherTermsMapping weather_terms[] = {
     { "fr", {
-        "CLAIR", "PLUTOT CLAIR", "PARTIELLEMENT NUAGEUX", "PARTIELLEMENT NUAGEUX", "NUAGEUX", "COUVERT", "BROUILLARD",
+        "CLAIR", "PLUTOT CLAIR", "PARTIELLEMENT NUAGEUX", "TRES NUAGEUX", "NUAGEUX", "COUVERT", "BROUILLARD",
         "BRUINE", "PLUIE", "FORTE PLUIE", "NEIGE", "AVERSES", "AVERSES DE NEIGE",
         "ORAGE", "GRELE", "BRUME", "LEGERE", "MODEREE", "FORTE",
-        "NUAGES CLAIRSEMES", "NUAGES EPARS", "PEU NUAGEUX"
+        "NUAGES CLAIRSEMES", "NUAGES EPARS", "PEU NUAGEUX",
+        "GRESIL", "FLOCONS", "VENT", "BRUME SECHE", "FUMEE", "PRECIPITATIONS",
+        "INTENSITE", "VERGLAÇANTE", "AVERSE", "EXTREME", "TRES", "SABLE", "POUSSIERE", "CENDRES", "VOLCANIQUE", "RAFALES", "TORNADE"
     }},
     { "es", {
-        "DESPEJADO", "MAYORMENTE DESPEJADO", "PARCIALMENTE NUBLADO", "PARCIALMENTE NUBLADO", "NUBLADO", "CUBIERTO", "NIEBLA",
+        "DESPEJADO", "MAYORMENTE DESPEJADO", "PARCIALMENTE NUBLADO", "MAYORMENTE NUBLADO", "NUBLADO", "CUBIERTO", "NIEBLA",
         "LLOVIZNA", "LLUVIA", "LLUVIA INTENSA", "NIEVE", "CHUBASCOS", "CHUBASCOS DE NIEVE",
         "TORMENTA", "GRANIZO", "NEBLINA", "LIGERA", "MODERADA", "INTENSA",
-        "NUBES ROTAS", "NUBES DISPERSAS", "POCAS NUBES"
+        "NUBES ROTAS", "NUBES DISPERSAS", "POCAS NUBES",
+        "AGUANIEVE", "NEVADAS", "VIENTO", "CALIMA", "HUMO", "PRECIPITACION",
+        "INTENSIDAD", "HELADA", "CHUBASCO", "EXTREMA", "MUY", "ARENA", "POLVO", "CENIZA", "VOLCANICA", "RAFAGAS", "TORNADO"
     }},
     { "de", {
-        "KLAR", "ÜBERWIEGEND KLAR", "TEILWEISE BEWOLKT", "TEILWEISE BEWOLKT", "WOLKIG", "BEDECKT", "NEBEL",
+        "KLAR", "UEBERWIEGEND KLAR", "TEILWEISE BEWOELKT", "UEBERWIEGEND BEWOELKT", "WOLKIG", "BEDECKT", "NEBEL",
         "NIESELREGEN", "REGEN", "STARKREGEN", "SCHNEE", "SCHAUER", "SCHNEESCHAUER",
         "GEWITTER", "HAGEL", "DUNST", "LEICHT", "MAESSIG", "STARK",
-        "AUFGELOCKERTE WOLKEN", "VEREINZELTE WOLKEN", "WENIGE WOLKEN"
+        "AUFGELOCKERTE WOLKEN", "VEREINZELTE WOLKEN", "WENIGE WOLKEN",
+        "SCHNEEREGEN", "SCHNEEGESTOBER", "WIND", "DUNST", "RAUCH", "NIEDERSCHLAG",
+        "INTENSITAET", "GEFRIEREND", "SCHAUER", "EXTREM", "SEHR", "SAND", "STAUB", "ASCHE", "VULKANISCH", "BOEEN", "TORNADO"
     }},
     { "it", {
-        "SERENO", "PREVALENTEMENTE SERENO", "PARZIALMENTE NUVOLOSO", "PARZIALMENTE NUVOLOSO", "NUVOLOSO", "COPERTO", "NEBBIA",
+        "SERENO", "PREVALENTEMENTE SERENO", "PARZIALMENTE NUVOLOSO", "PREVALENTEMENTE NUVOLOSO", "NUVOLOSO", "COPERTO", "NEBBIA",
         "PIOVIGGINE", "PIOGGIA", "PIOGGIA FORTE", "NEVE", "ROVESCI", "ROVESCI DI NEVE",
         "TEMPORALE", "GRANDINE", "FOSCHIA", "LEGGERA", "MODERATA", "FORTE",
-        "NUBI IRREGOLARI", "NUBI SPARSE", "POCHE NUVOLE"
+        "NUBI IRREGOLARI", "NUBI SPARSE", "POCHE NUVOLE",
+        "NEVISCHIO", "FIOCCHI", "VENTO", "FOSCHIA", "FUMO", "PRECIPITAZIONI",
+        "INTENSITA", "GELATA", "ROVESCIO", "ESTREMA", "MOLTO", "SABBIA", "POLVERE", "CENERE", "VULCANICA", "RAFFICHE", "TORNADO"
     }},
     { "pt", {
-        "LIMPO", "MAIORMENTE LIMPO", "PARCIALMENTE NUBLADO", "PARCIALMENTE NUBLADO", "NUBLADO", "ENCOBERTO", "NEVOEIRO",
+        "LIMPO", "MAIORMENTE LIMPO", "PARCIALMENTE NUBLADO", "MAIORMENTE NUBLADO", "NUBLADO", "ENCOBERTO", "NEVOEIRO",
         "CHUVISCO", "CHUVA", "CHUVA FORTE", "NEVE", "PANCADAS", "PANCADAS DE NEVE",
         "TROVOADA", "GRANIZO", "NEVOA", "LEVE", "MODERADA", "FORTE",
-        "NUVENS QUEBRADAS", "NUVENS DISPERSAS", "POUCAS NUVENS"
+        "NUVENS QUEBRADAS", "NUVENS DISPERSAS", "POUCAS NUVENS",
+        "GRANIZO FINO", "NEVASCAS", "VENTO", "NEBLINA", "FUMACA", "PRECIPITACAO",
+        "INTENSIDADE", "CONGELANTE", "PANCADA", "EXTREMA", "MUITO", "AREIA", "POEIRA", "CINZAS", "VULCANICA", "RAJADAS", "TORNADO"
     }},
     { "nl", {
-        "HELDER", "OVERWEGEND HELDER", "GEDEELTELIJK BEWOLKT", "GEDEELTELIJK BEWOLKT", "BEWOLKT", "OVERTROKKEN", "MIST",
+        "HELDER", "OVERWEGEND HELDER", "GEDEELTELIJK BEWOLKT", "OVERWEGEND BEWOLKT", "BEWOLKT", "BETROKKEN", "MIST",
         "MOTREGEN", "REGEN", "ZWARE REGEN", "SNEEUW", "BUIEN", "SNEEUWBUIEN",
         "ONWEER", "HAGEL", "NEVEL", "LICHT", "MATIG", "ZWAAR",
-        "ONDERBROKEN BEWOLKING", "VERSPREIDE BEWOLKING", "WEINIG BEWOLKING"
+        "WISSELEND BEWOLKT", "VERSPREIDE BEWOLKING", "WEINIG BEWOLKING",
+        "IJZEL", "SNEEUWVLAGEN", "WIND", "WAAS", "ROOK", "NEERSLAG",
+        "INTENSITEIT", "VRIEZEND", "BUI", "EXTREEM", "ZEER", "ZAND", "STOF", "AS", "VULKANISCH", "WINDSTOTEN", "TORNADO"
     }}
 };
 
@@ -163,30 +192,70 @@ inline void translateAPIWeatherTerms(String& desc, const char* lang) {
         if (strcmp(lang, weather_terms[i].lang) == 0) {
             const WeatherTermsMapping& translation = weather_terms[i];
 
-            desc.replace("MOSTLY CLEAR", translation.terms.mostly_clear);
-            desc.replace("CLEAR", translation.terms.clear);
-            desc.replace("MOSTLY CLOUDY", translation.terms.mostly_cloudy);
-            desc.replace("PARTLY CLOUDY", translation.terms.partly_cloudy);
-            desc.replace("CLOUDY", translation.terms.cloudy);
-            desc.replace("OVERCAST", translation.terms.overcast);
-            desc.replace("FOG", translation.terms.fog);
-            desc.replace("DRIZZLE", translation.terms.drizzle);
-            desc.replace("RAIN", translation.terms.rain);
-            desc.replace("HEAVY RAIN", translation.terms.heavy_rain);
-            desc.replace("SNOW", translation.terms.snow);
-            desc.replace("SHOWERS", translation.terms.showers);
-            desc.replace("SNOW SHOWERS", translation.terms.snow_showers);
-            desc.replace("THUNDERSTORM", translation.terms.thunderstorm);
-            desc.replace("HAIL", translation.terms.hail);
-            desc.replace("MIST", translation.terms.mist);
-            desc.replace("LIGHT", translation.terms.light);
-            desc.replace("MODERATE", translation.terms.moderate);
-            desc.replace("HEAVY", translation.terms.heavy);
+            desc.replace("OVERCAST CLOUDS", translation.terms.overcast);
             desc.replace("BROKEN CLOUDS", translation.terms.broken_clouds);
             desc.replace("SCATTERED CLOUDS", translation.terms.scattered_clouds);
             desc.replace("FEW CLOUDS", translation.terms.few_clouds);
+            desc.replace("CLEAR SKY", translation.terms.clear);
+            desc.replace("VOLCANIC ASH", String(translation.terms.volcanic) + " " + String(translation.terms.ash));
+            desc.replace("FREEZING RAIN", String(translation.terms.rain) + " " + String(translation.terms.freezing));
+            desc.replace("SHOWER RAIN", translation.terms.showers);
+            desc.replace("SHOWER SNOW", translation.terms.snow_showers);
+            desc.replace("SHOWER SLEET", String(translation.terms.shower) + " " + String(translation.terms.sleet));
+            desc.replace("RAIN AND SNOW", String(translation.terms.rain) + " " + String(translation.terms.snow));
+            desc.replace("SNOW SHOWERS", translation.terms.snow_showers);
+            desc.replace("HEAVY RAIN", translation.terms.heavy_rain);
+            desc.replace("MOSTLY CLEAR", translation.terms.mostly_clear);
+            desc.replace("MOSTLY CLOUDY", translation.terms.mostly_cloudy);
+            desc.replace("PARTLY CLOUDY", translation.terms.partly_cloudy);
+            desc.replace("FOGGY", translation.terms.fog);
+            desc.replace("MISTY", translation.terms.mist);
+            desc.replace("HAZY", translation.terms.haze);
+            desc.replace("RAINY", translation.terms.rain);
+            desc.replace("SNOWY", translation.terms.snow);
+            desc.replace("SMOKY", translation.terms.smoke);
+            desc.replace("WINDY", translation.terms.wind);
+            desc.replace("BREEZY", translation.terms.wind);
+            desc.replace("SQUALLS", translation.terms.squall);
+            desc.replace("SQUALL", translation.terms.squall);
+            desc.replace("TORNADO", translation.terms.tornado);
+            desc.replace("SAND", translation.terms.sand);
+            desc.replace("DUST", translation.terms.dust);
+            desc.replace("ASH", translation.terms.ash);
+            desc.replace("CLEAR", translation.terms.clear);
+            desc.replace("CLOUDY", translation.terms.cloudy);
+            desc.replace("OVERCAST", translation.terms.overcast);
+            desc.replace("FOG", translation.terms.fog);
+            desc.replace("MIST", translation.terms.mist);
+            desc.replace("HAZE", translation.terms.haze);
+            desc.replace("DRIZZLE", translation.terms.drizzle);
+            desc.replace("RAIN", translation.terms.rain);
+            desc.replace("SLEET", translation.terms.sleet);
+            desc.replace("SNOW", translation.terms.snow);
+            desc.replace("FLURRIES", translation.terms.flurries);
+            desc.replace("SHOWERS", translation.terms.showers);
+            desc.replace("SHOWER", translation.terms.shower);
+            desc.replace("THUNDERSTORM", translation.terms.thunderstorm);
+            desc.replace("HAIL", translation.terms.hail);
+            desc.replace("WIND", translation.terms.wind);
+            desc.replace("SMOKE", translation.terms.smoke);
+            desc.replace("PRECIPITATION", translation.terms.precipitation);
+            desc.replace("INTENSITY", translation.terms.intensity);
+            desc.replace("FREEZING", translation.terms.freezing);
+            desc.replace("EXTREME", translation.terms.extreme);
+            desc.replace("VERY", translation.terms.very);
+            desc.replace("LIGHT", translation.terms.light);
+            desc.replace("MODERATE", translation.terms.moderate);
+            desc.replace("HEAVY", translation.terms.heavy);
             desc.replace("CLOUDS", "");
             desc.replace("SKY", "");
+            desc.replace("WITH", "");
+            desc.replace("AND", "");
+
+            while (desc.indexOf("  ") >= 0) {
+                desc.replace("  ", " ");
+            }
+            desc.trim();
 
             break;
         }
